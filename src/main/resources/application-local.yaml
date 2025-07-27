@@ -1,0 +1,17 @@
+server:
+  port: 9000
+
+logging:
+  level:
+    ROOT: info
+    com.guavapay.dbs: trace
+    org.hibernate: DEBUG
+
+spring:
+  application:
+    name: adapter-websocket
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest

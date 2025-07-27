@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Rate WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .connect-btn { background-color: #4CAF50; color: white; }
+        .subscribe-btn { background-color: #2196F3; color: white; }
+        .unsubscribe-btn { background-color: #ff9800; color: white; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .status.connected { background-color: #d4edda; color: #155724; }
+        .status.disconnected { background-color: #f8d7da; color: #721c24; }
+
+        .rates {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .rate-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        .rate-pair { font-weight: bold; color: #2196F3; }
+        .rate-value { font-size: 18px; color: #27ae60; margin-top: 5px; }
+        .rate-time { font-size: 12px; color: #666; margin-top: 5px; }
+
+        .debug-log {
+            background-color: #000;
+            color: #0f0;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: scroll;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Crypto Rate WebSocket Client</h1>
+
+    <div class="controls">
+        <input type="text" id="serverUrl" value="http://localhost:9000/ws" placeholder="Server URL">
+        <button id="connectBtn" class="connect-btn">Connect</button>
+        <input type="text" id="fromCurrency" value="BTC" placeholder="From">
+        <input type="text" id="toCurrency" value="EUR" placeholder="To">
+        <button id="subscribeBtn" class="subscribe-btn" disabled>Subscribe</button>
+        <button id="unsubscribeBtn" class="unsubscribe-btn" disabled>Unsubscribe</button>
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="rates">
+        <h3>Live Rates</h3>
+        <div id="ratesList">No rates available</div>
+    </div>
+
+    <div class="debug-log" id="debugLog">Debug output will appear here...</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script>
+    let stompClient = null;
+    let connected = false;
+    let subscriptions = {};
+
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+    const ratesList = document.getElementById('ratesList');
+    const debugLog = document.getElementById('debugLog');
+
+    connectBtn.addEventListener('click', connect);
+    subscribeBtn.addEventListener('click', subscribe);
+    unsubscribeBtn.addEventListener('click', unsubscribe);
+
+    function log(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        debugLog.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        debugLog.scrollTop = debugLog.scrollHeight;
+        console.log(message);
+    }
+
+    function connect() {
+        const serverUrl = document.getElementById('serverUrl').value;
+
+        if (connected) {
+            disconnect();
+            return;
+        }
+
+        log('Attempting to connect to: ' + serverUrl);
+
+        const socket = new SockJS(serverUrl);
+        stompClient = Stomp.over(socket);
+
+        // Enable debug output
+        stompClient.debug = function(str) {
+            log('STOMP: ' + str);
+        };
+
+        stompClient.connect({}, function(frame) {
+            log('Connected successfully: ' + frame);
+            connected = true;
+            statusEl.textContent = 'Connected';
+            statusEl.className = 'status connected';
+            connectBtn.textContent = 'Disconnect';
+            subscribeBtn.disabled = false;
+            unsubscribeBtn.disabled = false;
+        }, function(error) {
+            log('Connection failed: ' + error);
+            connected = false;
+            statusEl.textContent = 'Connection failed: ' + error;
+            statusEl.className = 'status disconnected';
+        });
+    }
+
+    function disconnect() {
+        log('Disconnecting...');
+        if (stompClient) {
+            for (let key in subscriptions) {
+                subscriptions[key].unsubscribe();
+            }
+            stompClient.disconnect();
+        }
+        subscriptions = {};
+        connected = false;
+        statusEl.textContent = 'Disconnected';
+        statusEl.className = 'status disconnected';
+        connectBtn.textContent = 'Connect';
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        ratesList.innerHTML = 'No rates available';
+    }
+
+    function subscribe() {
+        if (!connected || !stompClient) {
+            log('ERROR: Not connected to server');
+            alert('Not connected to server');
+            return;
+        }
+
+        const from = document.getElementById('fromCurrency').value.trim().toUpperCase();
+        const to = document.getElementById('toCurrency').value.trim().toUpperCase();
+
+        if (!from || !to) {
+            log('ERROR: Missing currency values');
+            alert('Please enter both currencies');
+            return;
+        }
+
+        const pair = `${from}-${to}`;
+        if (subscriptions[pair]) {
+            log('ERROR: Already subscribed to ' + pair);
+            alert('Already subscribed to this pair');
+            return;
+        }
+
+        try {
+            const message = JSON.stringify({ from, to });
+            log('Sending subscribe message to /app/crypto.rate.subscribe: ' + message);
+
+            stompClient.send('/app/crypto.rate.subscribe', {}, message);
+
+            log('Setting up subscription for /topic/crypto/rates/' + pair);
+            subscriptions[pair] = stompClient.subscribe(`/topic/crypto/rates/${pair}`, function(message) {
+                log('Received rate data: ' + message.body);
+                const rateData = JSON.parse(message.body);
+                displayRate(pair, rateData);
+            });
+
+            statusEl.textContent = `Connected - Subscribed to ${pair}`;
+            log('Successfully subscribed to ' + pair);
+        } catch (error) {
+            log('ERROR subscribing: ' + error.message);
+            alert('Error subscribing: ' + error.message);
+        }
+    }
+
+    function unsubscribe() {
+        if (!connected || !stompClient) {
+            log('ERROR: Not connected to server');
+            alert('Not connected to server');
+            return;
+        }
+
+        const from = document.getElementById('fromCurrency').value.trim().toUpperCase();
+        const to = document.getElementById('toCurrency').value.trim().toUpperCase();
+
+        if (!from || !to) {
+            log('ERROR: Missing currency values');
+            alert('Please enter both currencies');
+            return;
+        }
+
+        const pair = `${from}-${to}`;
+
+        try {
+            const message = JSON.stringify({ from, to });
+            log('Sending unsubscribe message to /app/crypto.rate.unsubscribe: ' + message);
+
+            stompClient.send('/app/crypto.rate.unsubscribe', {}, message);
+
+            if (subscriptions[pair]) {
+                subscriptions[pair].unsubscribe();
+                delete subscriptions[pair];
+                log('Unsubscribed from ' + pair);
+            }
+
+            statusEl.textContent = `Connected - Unsubscribed from ${pair}`;
+        } catch (error) {
+            log('ERROR unsubscribing: ' + error.message);
+            alert('Error unsubscribing: ' + error.message);
+        }
+    }
+
+    function displayRate(pair, rateData) {
+        const timestamp = new Date().toLocaleTimeString();
+        const rateHtml = `
+            <div class="rate-item">
+                <div class="rate-pair">${pair}</div>
+                <div class="rate-value">Rate: ${rateData.rate}</div>
+                <div class="rate-time">Time: ${rateData.dateTime}</div>
+                <div class="rate-time">Received: ${timestamp}</div>
+            </div>
+        `;
+
+        if (ratesList.innerHTML === 'No rates available') {
+            ratesList.innerHTML = rateHtml;
+        } else {
+            ratesList.innerHTML = rateHtml + ratesList.innerHTML;
+        }
+    }
+</script>
+</body>
+</html>
