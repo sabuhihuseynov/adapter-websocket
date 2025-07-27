@@ -1,4 +1,4 @@
-package org.example.adapterwebsocket.messaging;
+package org.example.adapterwebsocket.event;
 
 import static org.example.adapterwebsocket.model.constant.RabbitConstants.Q_CRYPTO_RATE_NOTIFICATION;
 

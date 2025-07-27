@@ -19,16 +19,13 @@ public class CryptoRateSubscriptionController {
     @MessageMapping("/crypto.rate.subscribe")
     public void subscribeToPair(@Payload CurrencyPair currencyPair,
                                 SimpMessageHeaderAccessor headerAccessor) {
-        log.info("Subscribing to currency pair: {}", currencyPair);
-        String sessionId = headerAccessor.getSessionId();
-//        subscriptionService.subscribe(sessionId, currencyPair);
+        subscriptionService.subscribe(headerAccessor.getSessionId(), currencyPair);
     }
 
     @MessageMapping("/crypto.rate.unsubscribe")
     public void unsubscribeFromPair(@Payload CurrencyPair currencyPair,
                                     SimpMessageHeaderAccessor headerAccessor) {
-        String sessionId = headerAccessor.getSessionId();
-//        subscriptionService.unsubscribe(sessionId, currencyPair);
+        subscriptionService.unsubscribe(headerAccessor.getSessionId(), currencyPair);
     }
 }
 
