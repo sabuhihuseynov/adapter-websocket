@@ -29,7 +29,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
 
             if (authHeader == null) {
-                throw new IllegalArgumentException("Authorization token required");
+                return message;
             }
             UserTokenPayload userTokenPayload = authClient.verify(authHeader);
             accessor.setUser(new User(userTokenPayload.getUserId(), userTokenPayload.getCustomerId(),
