@@ -4,7 +4,7 @@ server:
 logging:
   level:
     ROOT: info
-    com.guavapay.dbs: trace
+    com.guavapay.dbs: DEBUG
     org.hibernate: DEBUG
 
 spring:

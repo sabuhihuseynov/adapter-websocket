@@ -100,8 +100,12 @@
     <h1>Crypto Rate WebSocket Client</h1>
 
     <div class="controls">
+        <input type="text" id="authToken" placeholder="Enter your auth token here" style="width: 300px;">
         <input type="text" id="serverUrl" value="http://localhost:9000/ws" placeholder="Server URL">
         <button id="connectBtn" class="connect-btn">Connect</button>
+    </div>
+
+    <div class="controls">
         <input type="text" id="fromCurrency" value="BTC" placeholder="From">
         <input type="text" id="toCurrency" value="EUR" placeholder="To">
         <button id="subscribeBtn" class="subscribe-btn" disabled>Subscribe</button>
@@ -115,7 +119,14 @@
         <div id="ratesList">No rates available</div>
     </div>
 
-    <div class="debug-log" id="debugLog">Debug output will appear here...</div>
+    <div class="debug-log" id="debugLog">
+        Debug output will appear here...<br>
+        <strong>Instructions:</strong><br>
+        1. Get your auth token from ms-auth service<br>
+        2. Paste it in the token field above<br>
+        3. Click Connect<br>
+        4. Enter currency pair and Subscribe<br>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
@@ -144,10 +155,16 @@
     }
 
     function connect() {
+        const token = document.getElementById('authToken').value.trim();
         const serverUrl = document.getElementById('serverUrl').value;
 
         if (connected) {
             disconnect();
+            return;
+        }
+
+        if (!token) {
+            alert('Please enter your authentication token');
             return;
         }
 
@@ -161,10 +178,15 @@
             log('STOMP: ' + str);
         };
 
-        stompClient.connect({}, function(frame) {
+        // Set up headers with auth token
+        const headers = {
+            'Authorization': 'Bearer ' + token
+        };
+
+        stompClient.connect(headers, function(frame) {
             log('Connected successfully: ' + frame);
             connected = true;
-            statusEl.textContent = 'Connected';
+            statusEl.textContent = 'Connected and Authenticated';
             statusEl.className = 'status connected';
             connectBtn.textContent = 'Disconnect';
             subscribeBtn.disabled = false;
@@ -174,6 +196,10 @@
             connected = false;
             statusEl.textContent = 'Connection failed: ' + error;
             statusEl.className = 'status disconnected';
+
+            if (error.includes('Invalid token') || error.includes('Authorization token required')) {
+                alert('Authentication failed. Please check your token.');
+            }
         });
     }
 
@@ -189,110 +215,4 @@
         connected = false;
         statusEl.textContent = 'Disconnected';
         statusEl.className = 'status disconnected';
-        connectBtn.textContent = 'Connect';
-        subscribeBtn.disabled = true;
-        unsubscribeBtn.disabled = true;
-        ratesList.innerHTML = 'No rates available';
-    }
-
-    function subscribe() {
-        if (!connected || !stompClient) {
-            log('ERROR: Not connected to server');
-            alert('Not connected to server');
-            return;
-        }
-
-        const from = document.getElementById('fromCurrency').value.trim().toUpperCase();
-        const to = document.getElementById('toCurrency').value.trim().toUpperCase();
-
-        if (!from || !to) {
-            log('ERROR: Missing currency values');
-            alert('Please enter both currencies');
-            return;
-        }
-
-        const pair = `${from}-${to}`;
-        if (subscriptions[pair]) {
-            log('ERROR: Already subscribed to ' + pair);
-            alert('Already subscribed to this pair');
-            return;
-        }
-
-        try {
-            const message = JSON.stringify({ from, to });
-            log('Sending subscribe message to /app/crypto.rate.subscribe: ' + message);
-
-            stompClient.send('/app/crypto.rate.subscribe', {}, message);
-
-            log('Setting up subscription for /topic/crypto/rates/' + pair);
-            subscriptions[pair] = stompClient.subscribe(`/topic/crypto/rates/${pair}`, function(message) {
-                log('Received rate data: ' + message.body);
-                const rateData = JSON.parse(message.body);
-                displayRate(pair, rateData);
-            });
-
-            statusEl.textContent = `Connected - Subscribed to ${pair}`;
-            log('Successfully subscribed to ' + pair);
-        } catch (error) {
-            log('ERROR subscribing: ' + error.message);
-            alert('Error subscribing: ' + error.message);
-        }
-    }
-
-    function unsubscribe() {
-        if (!connected || !stompClient) {
-            log('ERROR: Not connected to server');
-            alert('Not connected to server');
-            return;
-        }
-
-        const from = document.getElementById('fromCurrency').value.trim().toUpperCase();
-        const to = document.getElementById('toCurrency').value.trim().toUpperCase();
-
-        if (!from || !to) {
-            log('ERROR: Missing currency values');
-            alert('Please enter both currencies');
-            return;
-        }
-
-        const pair = `${from}-${to}`;
-
-        try {
-            const message = JSON.stringify({ from, to });
-            log('Sending unsubscribe message to /app/crypto.rate.unsubscribe: ' + message);
-
-            stompClient.send('/app/crypto.rate.unsubscribe', {}, message);
-
-            if (subscriptions[pair]) {
-                subscriptions[pair].unsubscribe();
-                delete subscriptions[pair];
-                log('Unsubscribed from ' + pair);
-            }
-
-            statusEl.textContent = `Connected - Unsubscribed from ${pair}`;
-        } catch (error) {
-            log('ERROR unsubscribing: ' + error.message);
-            alert('Error unsubscribing: ' + error.message);
-        }
-    }
-
-    function displayRate(pair, rateData) {
-        const timestamp = new Date().toLocaleTimeString();
-        const rateHtml = `
-            <div class="rate-item">
-                <div class="rate-pair">${pair}</div>
-                <div class="rate-value">Rate: ${rateData.rate}</div>
-                <div class="rate-time">Time: ${rateData.dateTime}</div>
-                <div class="rate-time">Received: ${timestamp}</div>
-            </div>
-        `;
-
-        if (ratesList.innerHTML === 'No rates available') {
-            ratesList.innerHTML = rateHtml;
-        } else {
-            ratesList.innerHTML = rateHtml + ratesList.innerHTML;
-        }
-    }
-</script>
-</body>
-</html>
+        connectBtn.textContent = '

@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.example.adapterwebsocket.interceptor.WebSocketAuthInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.converter.DefaultContentTypeResolver;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.converter.MessageConverter;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -17,7 +20,10 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    WebSocketAuthInterceptor webSocketAuthInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -30,6 +36,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(webSocketAuthInterceptor);
     }
 
     @Override
