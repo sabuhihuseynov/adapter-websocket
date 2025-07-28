@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -13,19 +12,6 @@ public class CurrencyPair {
 
     private String from;
     private String to;
-
-    public static CurrencyPair fromString(String pairString) {
-        if (pairString == null || !pairString.contains("-")) {
-            throw new IllegalArgumentException("Invalid currency pair format: " + pairString);
-        }
-
-        String[] parts = pairString.split("-", 2);
-        return new CurrencyPair(parts[0], parts[1]);
-    }
-
-    public String getTopicName() {
-        return "/topic/rates/" + toString();
-    }
 
     @Override
     public boolean equals(Object o) {
