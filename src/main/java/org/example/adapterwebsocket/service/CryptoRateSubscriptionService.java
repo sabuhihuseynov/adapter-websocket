@@ -53,32 +53,21 @@ public class CryptoRateSubscriptionService {
         log.info("Cleaned up {} subscriptions for disconnected session {}", sessionPairs.size(), sessionId);
     }
 
-    /**
-     * Adds a session to a currency pair subscription.
-     * Starts rate streaming if this is the first subscriber.
-     */
     private void addSessionToPair(String sessionId, CurrencyPair currencyPair) {
         Set<String> subscribers = pairSubscriptions.computeIfAbsent(currencyPair, k -> ConcurrentHashMap.newKeySet());
         boolean wasEmpty = subscribers.isEmpty();
         subscribers.add(sessionId);
 
         if (wasEmpty) {
-            startRateStreaming(currencyPair);
+//            startRateStreaming(currencyPair);
         }
     }
 
-    /**
-     * Adds a currency pair to a session's subscriptions.
-     */
     private void addPairToSession(String sessionId, CurrencyPair currencyPair) {
         sessionSubscriptions.computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
                 .add(currencyPair);
     }
 
-    /**
-     * Removes a session from a currency pair subscription.
-     * Stops rate streaming if this was the last subscriber.
-     */
     private void removeSessionFromPair(String sessionId, CurrencyPair currencyPair) {
         Set<String> subscribers = pairSubscriptions.get(currencyPair);
         if (subscribers == null) {
@@ -88,13 +77,10 @@ public class CryptoRateSubscriptionService {
         subscribers.remove(sessionId);
         if (subscribers.isEmpty()) {
             pairSubscriptions.remove(currencyPair);
-            stopRateStreaming(currencyPair);
+//            stopRateStreaming(currencyPair);
         }
     }
 
-    /**
-     * Removes a currency pair from a session's subscriptions.
-     */
     private void removePairFromSession(String sessionId, CurrencyPair currencyPair) {
         Set<CurrencyPair> sessionPairs = sessionSubscriptions.get(sessionId);
         if (sessionPairs != null) {
