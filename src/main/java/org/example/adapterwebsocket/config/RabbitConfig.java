@@ -1,10 +1,15 @@
 package org.example.adapterwebsocket.config;
 
-import static org.example.adapterwebsocket.model.constant.RabbitConstants.Q_CRYPTO_RATE_NOTIFICATION;
+import static org.example.adapterwebsocket.model.constant.RabbitConstants.K_CRYPTO_RATE_LIVE;
+import static org.example.adapterwebsocket.model.constant.RabbitConstants.Q_CRYPTO_RATE_LIVE;
+import static org.example.adapterwebsocket.model.constant.RabbitConstants.X_DBS_WEBSOCKET;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,8 +22,20 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitConfig {
 
     @Bean
-    public Queue cryptoRateQueue() {
-        return new Queue(Q_CRYPTO_RATE_NOTIFICATION);
+    public DirectExchange websocketExchange() {
+        return new DirectExchange(X_DBS_WEBSOCKET);
+    }
+
+    @Bean
+    public Queue cryptoRateStreamQueue() {
+        return new Queue(Q_CRYPTO_RATE_LIVE);
+    }
+
+    @Bean
+    public Binding cryptoRateStreamBinding() {
+        return BindingBuilder.bind(cryptoRateStreamQueue())
+                .to(websocketExchange())
+                .with(K_CRYPTO_RATE_LIVE);
     }
 
     @Bean
