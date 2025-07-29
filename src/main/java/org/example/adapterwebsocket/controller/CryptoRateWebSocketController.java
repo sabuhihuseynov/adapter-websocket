@@ -12,7 +12,7 @@ import org.springframework.stereotype.Controller;
 @Controller
 @RequiredArgsConstructor
 @Slf4j
-public class CryptoRateSubscriptionController {
+public class CryptoRateWebSocketController {
 
     private final CryptoRateSubscriptionService subscriptionService;
 

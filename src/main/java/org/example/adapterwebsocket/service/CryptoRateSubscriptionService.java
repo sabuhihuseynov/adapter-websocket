@@ -101,6 +101,10 @@ public class CryptoRateSubscriptionService {
         cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(Set.of(currencyPair), false));
     }
 
+    public boolean hasPairSubscription(CurrencyPair currencyPair) {
+        return pairSubscriptions.containsKey(currencyPair) && !pairSubscriptions.get(currencyPair).isEmpty();
+    }
+
     @PreDestroy
     public void stopAllActiveRateStreaming() {
         log.warn("Stopping all active rate streaming...");
