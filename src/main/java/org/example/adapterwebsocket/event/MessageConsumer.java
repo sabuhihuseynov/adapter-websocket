@@ -1,6 +1,6 @@
 package org.example.adapterwebsocket.event;
 
-import static org.example.adapterwebsocket.model.constant.RabbitConstants.Q_CRYPTO_RATE_NOTIFICATION;
+import static org.example.adapterwebsocket.model.constant.RabbitConstants.Q_CRYPTO_RATE_LIVE;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ public class MessageConsumer {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
 
-    @RabbitListener(queues = Q_CRYPTO_RATE_NOTIFICATION)
+    @RabbitListener(queues = Q_CRYPTO_RATE_LIVE)
     public void createNotificationListener(BaseEvent<CryptoRateEventDto> cryptoRateEvent) {
         log.info("Start crypto rate event: {}", cryptoRateEvent);
         var payload = cryptoRateEvent.getPayload();
