@@ -7,6 +7,8 @@ import org.example.adapterwebsocket.client.CryptoCurrencyClient;
 import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
 import org.example.adapterwebsocket.model.CurrencyPair;
 import org.springframework.stereotype.Service;
+
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 
@@ -49,7 +51,18 @@ public class CryptoRateSubscriptionService {
             return;
         }
 
-        sessionPairs.forEach(pair -> removeSessionFromPair(sessionId, pair));
+        Set<CurrencyPair> pairsToDisable = new HashSet<>();
+        sessionPairs.forEach(pair -> {
+            Set<String> subscribers = pairSubscriptions.get(pair);
+            if (subscribers != null) {
+                subscribers.remove(sessionId);
+                if (subscribers.isEmpty()) {
+                    pairSubscriptions.remove(pair);
+                    pairsToDisable.add(pair);
+                }
+            }
+        });
+        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
         log.info("Cleaned up {} subscriptions for disconnected session {}", sessionPairs.size(), sessionId);
     }
 
@@ -59,7 +72,7 @@ public class CryptoRateSubscriptionService {
         subscribers.add(sessionId);
 
         if (wasEmpty) {
-            startRateStreaming(currencyPair);
+            enableRateStreaming(currencyPair);
         }
     }
 
@@ -77,7 +90,7 @@ public class CryptoRateSubscriptionService {
         subscribers.remove(sessionId);
         if (subscribers.isEmpty()) {
             pairSubscriptions.remove(currencyPair);
-            stopRateStreaming(currencyPair);
+            disableRateStreaming(currencyPair);
         }
     }
 
@@ -91,12 +104,12 @@ public class CryptoRateSubscriptionService {
         }
     }
 
-    private void startRateStreaming(CurrencyPair currencyPair) {
+    private void enableRateStreaming(CurrencyPair currencyPair) {
         log.info("Starting rate streaming for currency pair {} (first subscriber)", currencyPair);
         cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(Set.of(currencyPair), true));
     }
 
-    private void stopRateStreaming(CurrencyPair currencyPair) {
+    private void disableRateStreaming(CurrencyPair currencyPair) {
         log.info("Stopping rate streaming for currency pair {} (no more subscribers)", currencyPair);
         cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(Set.of(currencyPair), false));
     }
