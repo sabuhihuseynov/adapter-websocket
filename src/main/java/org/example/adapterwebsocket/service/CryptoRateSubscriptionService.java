@@ -59,7 +59,7 @@ public class CryptoRateSubscriptionService {
         subscribers.add(sessionId);
 
         if (wasEmpty) {
-//            startRateStreaming(currencyPair);
+            startRateStreaming(currencyPair);
         }
     }
 
@@ -77,7 +77,7 @@ public class CryptoRateSubscriptionService {
         subscribers.remove(sessionId);
         if (subscribers.isEmpty()) {
             pairSubscriptions.remove(currencyPair);
-//            stopRateStreaming(currencyPair);
+            stopRateStreaming(currencyPair);
         }
     }
 
