@@ -16,10 +16,9 @@ public class CryptoRateSubscriptionRedisRepository {
 
     private final RedisTemplate<String, String> cryptoRateSubscriptionRedisTemplate;
 
-    private static final String BASE_KEY = "dbs.crypto.live.rate";
+    private static final String BASE_KEY = "dbs.websocket.crypto.rate";
     private static final String PAIR_SUBSCRIBERS_PREFIX = String.format("%s.%s", BASE_KEY, "pair.subscribers");
     private static final String CUSTOMER_SUBSCRIPTIONS_PREFIX = String.format("%s.%s", BASE_KEY, "customer.pairs");
-    private static final String SESSION_MAPPING_PREFIX = String.format("%s.%s", BASE_KEY, "active.session.mapping");
 
     public void addCustomerToPair(String customerId, CurrencyPair currencyPair) {
         String pairKey = getPairSubscribersKey(currencyPair);
@@ -82,7 +81,6 @@ public class CryptoRateSubscriptionRedisRepository {
         Set<CurrencyPair> customerPairs = getCustomerSubscriptions(customerKey);
 
         if (customerPairs.isEmpty()) {
-            log.debug("No subscriptions found for customer {}", customerId);
             return new HashSet<>();
         }
 
@@ -93,46 +91,6 @@ public class CryptoRateSubscriptionRedisRepository {
         return customerPairs;
     }
 
-    public void storeSessionMapping(String sessionId, String customerId) {
-        if (sessionId == null || customerId == null) {
-            log.warn("Cannot store session mapping - sessionId or customerId is null");
-            return;
-        }
-
-        String key = getSessionMappingKey(sessionId);
-        cryptoRateSubscriptionRedisTemplate.opsForValue().set(key, customerId);
-
-        log.debug("Stored session mapping: {} → {}", sessionId, customerId);
-    }
-
-    public String getCustomerIdBySessionId(String sessionId) {
-        if (sessionId == null) {
-            return null;
-        }
-
-        String key = getSessionMappingKey(sessionId);
-        String customerId = cryptoRateSubscriptionRedisTemplate.opsForValue().get(key);
-
-        if (customerId == null) {
-            log.debug("No customerId found for session {}", sessionId);
-        } else {
-            log.debug("Found customerId {} for session {}", customerId, sessionId);
-        }
-
-        return customerId;
-    }
-
-    public void removeSessionMapping(String sessionId) {
-        if (sessionId == null) {
-            return;
-        }
-
-        String key = getSessionMappingKey(sessionId);
-        cryptoRateSubscriptionRedisTemplate.delete(key);
-
-        log.debug("Removed session mapping for session : {}", sessionId);
-    }
-
     private String getPairSubscribersKey(CurrencyPair currencyPair) {
         return String.format("%s.%s", PAIR_SUBSCRIBERS_PREFIX, currencyPair.toString());
     }
@@ -141,7 +99,4 @@ public class CryptoRateSubscriptionRedisRepository {
         return String.format("%s.%s", CUSTOMER_SUBSCRIPTIONS_PREFIX, customerId);
     }
 
-    private String getSessionMappingKey(String sessionId) {
-        return String.format("%s.%s", SESSION_MAPPING_PREFIX, sessionId);
-    }
 }

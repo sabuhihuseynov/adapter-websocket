@@ -1,5 +1,8 @@
 package org.example.adapterwebsocket.service;
 
+import static org.example.adapterwebsocket.service.PodSessionManager.POD_ID;
+
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.util.HashSet;
@@ -17,6 +20,7 @@ public class CryptoRateSubscriptionService {
 
     private final CryptoCurrencyClient cryptoCurrencyClient;
     private final CryptoRateSubscriptionRedisRepository cryptoRateSubscriptionRedisRepository;
+    private final PodSessionManager podSessionManager;
 
     public void subscribe(String customerId, CurrencyPair currencyPair) {
         log.info("Subscribing customer {} to currency pair {}", customerId, currencyPair);
@@ -56,10 +60,10 @@ public class CryptoRateSubscriptionService {
     }
 
     public void handleSessionDisconnect(String sessionId) {
-        var customerId = cryptoRateSubscriptionRedisRepository.getCustomerIdBySessionId(sessionId);
+        var customerId = podSessionManager.getCustomerBySession(sessionId);
         if (customerId != null) {
             handleCustomerDisconnect(customerId);
-            cryptoRateSubscriptionRedisRepository.removeSessionMapping(sessionId);
+            podSessionManager.unregisterSession(sessionId);
         }
     }
 
@@ -73,10 +77,16 @@ public class CryptoRateSubscriptionService {
             log.info("Customer {} had no subscriptions", customerId);
             return;
         }
+        disableRateStreamingIfApplicable(customerPairs);
 
+        log.info("Cleaned up customer {} - removed {} subscriptions",
+                customerId, customerPairs.size());
+    }
+
+    private void disableRateStreamingIfApplicable(Set<CurrencyPair> currencyPairs) {
         Set<CurrencyPair> pairsToDisable = new HashSet<>();
 
-        customerPairs.forEach(pair -> {
+        currencyPairs.forEach(pair -> {
             long remainingSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(pair);
             if (remainingSubscribers == 0) {
                 pairsToDisable.add(pair);
@@ -88,9 +98,6 @@ public class CryptoRateSubscriptionService {
             log.info("Stopping rate streaming for {} pairs", pairsToDisable.size());
             cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
         }
-
-        log.info("Cleaned up customer {} - removed {} subscriptions",
-                customerId, customerPairs.size());
     }
 
     public boolean hasPairSubscription(CurrencyPair currencyPair) {
@@ -118,6 +125,24 @@ public class CryptoRateSubscriptionService {
             log.info("Successfully disabled rate streaming for {}", currencyPair);
         } catch (Exception e) {
             log.error("Failed to disable rate streaming for {}: {}", currencyPair, e.getMessage());
+        }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        log.info("Pod {} shutting down - cleaning up sessions (crypto rate subscription handling)", POD_ID);
+        cleanupPodSessions();
+    }
+
+    private void cleanupPodSessions() {
+        Set<String> sessions = podSessionManager.getActiveSessionsForPod();
+
+        if (sessions != null && !sessions.isEmpty()) {
+            log.info("Cleaning up {} sessions for pod {}", sessions.size(), POD_ID);
+
+            sessions.forEach(this::handleSessionDisconnect);
+            podSessionManager.getActiveSessionsForPod();
+            podSessionManager.removePodSessions();
         }
     }
 }
