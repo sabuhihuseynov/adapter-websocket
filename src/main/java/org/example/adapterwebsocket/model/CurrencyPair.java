@@ -13,6 +13,19 @@ public class CurrencyPair {
     private String from;
     private String to;
 
+    public static CurrencyPair fromString(String pairString) {
+        if (pairString == null || pairString.trim().isEmpty()) {
+            throw new IllegalArgumentException("Currency pair string cannot be null or empty");
+        }
+
+        String[] parts = pairString.split("-");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Invalid currency pair format: " + pairString);
+        }
+
+        return new CurrencyPair(parts[0].trim(), parts[1].trim());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
