@@ -53,9 +53,7 @@ public class CryptoRateWebSocketController {
     }
 
     private String getCustomerIdFromPrincipal(Principal principal) {
-        return (principal instanceof User user)
-                ? user.getCustomerId()
-                : null;
+        return (principal instanceof User user) ? user.getCustomerId() : null;
     }
 }
 
