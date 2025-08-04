@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.AuthClient;
 import org.example.adapterwebsocket.client.model.UserTokenPayload;
+import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
 import org.example.adapterwebsocket.model.User;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final AuthClient authClient;
+    private final CryptoRateSubscriptionRedisRepository cryptoRateSubscriptionRedisRepository;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -31,14 +33,29 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             if (authHeader == null) {
                 return message;
             }
-            UserTokenPayload userTokenPayload = authClient.verify(authHeader);
-            accessor.setUser(new User(userTokenPayload.getUserId(), userTokenPayload.getCustomerId(),
-                    userTokenPayload.getIndividualId()));
+//            UserTokenPayload userTokenPayload = authClient.verify(authHeader);
+            UserTokenPayload userTokenPayload = getUserTokenPayload(authHeader);
+            String sessionId = accessor.getSessionId();
+            String customerId = userTokenPayload.getCustomerId();
+
+            cryptoRateSubscriptionRedisRepository.storeSessionMapping(sessionId, customerId);
+
+            accessor.setUser(new User(userTokenPayload.getUserId(), customerId, userTokenPayload.getIndividualId()));
 
             log.info("User {} authenticated for WebSocket session {}", userTokenPayload.getUserId(),
                     accessor.getSessionId());
         }
 
         return message;
+    }
+
+    public UserTokenPayload getUserTokenPayload(String authHeader) {
+        String auth = authHeader.replace("Bearer ", "");
+        String[] tokens = auth.split("-");
+        return UserTokenPayload.builder()
+                .customerId(tokens[0])
+                .userId(tokens[1])
+                .individualId(tokens[2])
+                .build();
     }
 }

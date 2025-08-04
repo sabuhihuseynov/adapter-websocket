@@ -1,148 +1,123 @@
 package org.example.adapterwebsocket.service;
 
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.util.HashSet;
+import java.util.Set;
 import org.example.adapterwebsocket.client.CryptoCurrencyClient;
 import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
+import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
 import org.example.adapterwebsocket.model.CurrencyPair;
 import org.springframework.stereotype.Service;
-
-import java.util.HashSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Set;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class CryptoRateSubscriptionService {
 
-    private final ConcurrentHashMap<CurrencyPair, Set<String>> pairSubscriptions = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Set<CurrencyPair>> sessionSubscriptions = new ConcurrentHashMap<>();
     private final CryptoCurrencyClient cryptoCurrencyClient;
+    private final CryptoRateSubscriptionRedisRepository cryptoRateSubscriptionRedisRepository;
 
-    public void subscribe(String sessionId, CurrencyPair currencyPair) {
-        log.info("Subscribing session {} to currency pair {}", sessionId, currencyPair);
+    public void subscribe(String customerId, CurrencyPair currencyPair) {
+        log.info("Subscribing customer {} to currency pair {}", customerId, currencyPair);
 
-        addSessionToPair(sessionId, currencyPair);
-        addPairToSession(sessionId, currencyPair);
+        long subscribersBeforeAdd = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
 
-        log.info("Session {} subscribed to {}. Total subscribers for this pair: {}",
-                sessionId, currencyPair, pairSubscriptions.get(currencyPair).size());
+        if (subscribersBeforeAdd == 0) {
+            log.info("First subscriber for {}. Starting rate streaming", currencyPair);
+            enableRateStreaming(currencyPair);
+        }
+
+        cryptoRateSubscriptionRedisRepository.addCustomerToPair(customerId, currencyPair);
+
+        cryptoRateSubscriptionRedisRepository.addPairToCustomer(customerId, currencyPair);
+
+        long totalSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
+        log.info("Customer {} subscribed to {}. Total subscribers for this pair: {}",
+                customerId, currencyPair, totalSubscribers);
     }
 
-    public void unsubscribe(String sessionId, CurrencyPair currencyPair) {
-        log.info("Unsubscribing session {} from currency pair {}", sessionId, currencyPair);
+    public void unsubscribe(String customerId, CurrencyPair currencyPair) {
+        log.info("Unsubscribing customer {} from currency pair {}", customerId, currencyPair);
 
-        removeSessionFromPair(sessionId, currencyPair);
-        removePairFromSession(sessionId, currencyPair);
+        cryptoRateSubscriptionRedisRepository.removeCustomerFromPair(customerId, currencyPair);
 
-        int remainingSubscribers = pairSubscriptions.getOrDefault(currencyPair, Set.of()).size();
-        log.info("Session {} unsubscribed from {}. Remaining subscribers for this pair: {}",
-                sessionId, currencyPair, remainingSubscribers);
+        cryptoRateSubscriptionRedisRepository.removePairFromCustomer(customerId, currencyPair);
+
+        long remainingSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
+
+        if (remainingSubscribers == 0) {
+            log.info("No more subscribers for {}. Stopping rate streaming", currencyPair);
+            disableRateStreaming(currencyPair);
+        }
+
+        log.info("Customer {} unsubscribed from {}. Remaining subscribers for this pair: {}",
+                customerId, currencyPair, remainingSubscribers);
     }
 
     public void handleSessionDisconnect(String sessionId) {
-        log.info("Handling session disconnect for session {}", sessionId);
+        var customerId = cryptoRateSubscriptionRedisRepository.getCustomerIdBySessionId(sessionId);
+        if (customerId != null) {
+            handleCustomerDisconnect(customerId);
+            cryptoRateSubscriptionRedisRepository.removeSessionMapping(sessionId);
+        }
+    }
 
-        Set<CurrencyPair> sessionPairs = sessionSubscriptions.remove(sessionId);
-        if (sessionPairs == null || sessionPairs.isEmpty()) {
-            log.info("No subscriptions found for disconnected session {}", sessionId);
+    public void handleCustomerDisconnect(String customerId) {
+        log.info("Handling disconnect for customer {}", customerId);
+
+        Set<CurrencyPair> customerPairs = cryptoRateSubscriptionRedisRepository
+                .removeAllCustomerSubscriptions(customerId);
+
+        if (customerPairs.isEmpty()) {
+            log.info("Customer {} had no subscriptions", customerId);
             return;
         }
 
         Set<CurrencyPair> pairsToDisable = new HashSet<>();
-        sessionPairs.forEach(pair -> {
-            Set<String> subscribers = pairSubscriptions.get(pair);
-            if (subscribers != null) {
-                subscribers.remove(sessionId);
-                if (subscribers.isEmpty()) {
-                    pairSubscriptions.remove(pair);
-                    pairsToDisable.add(pair);
-                }
+
+        customerPairs.forEach(pair -> {
+            long remainingSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(pair);
+            if (remainingSubscribers == 0) {
+                pairsToDisable.add(pair);
+                log.info("Pair {} now has no subscribers", pair);
             }
         });
-        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
-        log.info("Cleaned up {} subscriptions for disconnected session {}", sessionPairs.size(), sessionId);
-    }
 
-    private void addSessionToPair(String sessionId, CurrencyPair currencyPair) {
-        Set<String> subscribers = pairSubscriptions.computeIfAbsent(currencyPair, k -> ConcurrentHashMap.newKeySet());
-        boolean wasEmpty = subscribers.isEmpty();
-        subscribers.add(sessionId);
-
-        if (wasEmpty) {
-            enableRateStreaming(currencyPair);
-        }
-    }
-
-    private void addPairToSession(String sessionId, CurrencyPair currencyPair) {
-        sessionSubscriptions.computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
-                .add(currencyPair);
-    }
-
-    private void removeSessionFromPair(String sessionId, CurrencyPair currencyPair) {
-        Set<String> subscribers = pairSubscriptions.get(currencyPair);
-        if (subscribers == null) {
-            return;
+        if (!pairsToDisable.isEmpty()) {
+            log.info("Stopping rate streaming for {} pairs", pairsToDisable.size());
+            cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
         }
 
-        subscribers.remove(sessionId);
-        if (subscribers.isEmpty()) {
-            pairSubscriptions.remove(currencyPair);
-            disableRateStreaming(currencyPair);
-        }
-    }
-
-    private void removePairFromSession(String sessionId, CurrencyPair currencyPair) {
-        Set<CurrencyPair> sessionPairs = sessionSubscriptions.get(sessionId);
-        if (sessionPairs != null) {
-            sessionPairs.remove(currencyPair);
-            if (sessionPairs.isEmpty()) {
-                sessionSubscriptions.remove(sessionId);
-            }
-        }
-    }
-
-    private void enableRateStreaming(CurrencyPair currencyPair) {
-        log.info("Starting rate streaming for currency pair {} (first subscriber)", currencyPair);
-        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(Set.of(currencyPair), true));
-    }
-
-    private void disableRateStreaming(CurrencyPair currencyPair) {
-        log.info("Stopping rate streaming for currency pair {} (no more subscribers)", currencyPair);
-        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(Set.of(currencyPair), false));
+        log.info("Cleaned up customer {} - removed {} subscriptions",
+                customerId, customerPairs.size());
     }
 
     public boolean hasPairSubscription(CurrencyPair currencyPair) {
-        return pairSubscriptions.containsKey(currencyPair) && !pairSubscriptions.get(currencyPair).isEmpty();
+        boolean hasActiveSubscriptions = cryptoRateSubscriptionRedisRepository.hasPairSubscribers(currencyPair);
+
+        log.debug("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
+
+        return hasActiveSubscriptions;
     }
 
-    @PreDestroy
-    public void stopAllActiveRateStreaming() {
-        log.warn("Stopping all active rate streaming...");
-
+    private void enableRateStreaming(CurrencyPair currencyPair) {
         try {
-            Set<CurrencyPair> activePairs = pairSubscriptions.keySet();
-
-            if (activePairs.isEmpty()) {
-                log.info("No active currency pairs to stop during shutdown");
-                return;
-            }
-
-            log.info("Stopping rate streaming for {} active currency pairs: {}",
-                    activePairs.size(), activePairs);
-
-            cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(activePairs, false));
-
-            int totalSessions = sessionSubscriptions.size();
-            int totalPairSubscriptions = pairSubscriptions.size();
-
-            log.warn("Stopping all active streaming completed. Cleaned up {} sessions and {} pair subscriptions",
-                    totalSessions, totalPairSubscriptions);
+            var request = new RateStreamControlRequest(Set.of(currencyPair), true);
+            cryptoCurrencyClient.controlRateStreaming(request);
+            log.info("Successfully enabled rate streaming for {}", currencyPair);
         } catch (Exception e) {
-            log.error("Error during stopping all active streaming: {}", e.getMessage(), e);
+            log.error("Failed to enable rate streaming for {}: {}", currencyPair, e.getMessage());
         }
     }
 
+    private void disableRateStreaming(CurrencyPair currencyPair) {
+        try {
+            var request = new RateStreamControlRequest(Set.of(currencyPair), false);
+            cryptoCurrencyClient.controlRateStreaming(request);
+            log.info("Successfully disabled rate streaming for {}", currencyPair);
+        } catch (Exception e) {
+            log.error("Failed to disable rate streaming for {}: {}", currencyPair, e.getMessage());
+        }
+    }
 }
