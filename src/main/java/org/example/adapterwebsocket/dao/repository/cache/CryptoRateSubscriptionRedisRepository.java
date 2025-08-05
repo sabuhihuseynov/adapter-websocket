@@ -15,7 +15,7 @@ public class CryptoRateSubscriptionRedisRepository {
 
     private static final String BASE_KEY = "dbs.websocket.crypto.rate";
     private static final String PAIR_SUBSCRIBERS_PREFIX = String.format("%s.%s", BASE_KEY, "pair.subscribers");
-    private static final String CUSTOMER_SUBSCRIPTIONS_PREFIX = String.format("%s.%s", BASE_KEY, "customer.pairs");
+    private static final String SESSION_SUBSCRIPTIONS_PREFIX = String.format("%s.%s", BASE_KEY, "session.pairs");
 
     private final RedisTemplate<String, String> redisTemplate;
 
@@ -24,38 +24,38 @@ public class CryptoRateSubscriptionRedisRepository {
         this.redisTemplate = redisTemplate;
     }
 
-    public void addCustomerToPair(String customerId, CurrencyPair currencyPair) {
+    public void addSessionToPair(String sessionId, CurrencyPair currencyPair) {
         String pairKey = getPairSubscribersKey(currencyPair);
-        log.info("Adding customer {} to pair {}", customerId, currencyPair);
+        log.info("Adding session {} to pair {}", sessionId, currencyPair);
 
-        redisTemplate.opsForSet().add(pairKey, customerId);
+        redisTemplate.opsForSet().add(pairKey, sessionId);
     }
 
-    public void addPairToCustomer(String customerId, CurrencyPair currencyPair) {
-        String customerKey = getCustomerSubscriptionsKey(customerId);
+    public void addPairToSession(String sessionId, CurrencyPair currencyPair) {
+        String sessionKey = getSessionSubscriptionsKey(sessionId);
         String pairString = currencyPair.toString();
-        log.info("Adding pair {} to customer {}", pairString, customerId);
+        log.info("Adding pair {} to session {}", pairString, sessionId);
 
-        redisTemplate.opsForSet().add(customerKey, pairString);
+        redisTemplate.opsForSet().add(sessionKey, pairString);
     }
 
-    public void removeCustomerFromPair(String customerId, CurrencyPair currencyPair) {
+    public void removeSessionFromPair(String sessionId, CurrencyPair currencyPair) {
         String pairKey = getPairSubscribersKey(currencyPair);
-        log.info("Removing customer {} from pair {}", customerId, currencyPair);
+        log.info("Removing session {} from pair {}", sessionId, currencyPair);
 
-        redisTemplate.opsForSet().remove(pairKey, customerId);
+        redisTemplate.opsForSet().remove(pairKey, sessionId);
     }
 
-    public void removePairFromCustomer(String customerId, CurrencyPair currencyPair) {
-        String customerKey = getCustomerSubscriptionsKey(customerId);
+    public void removePairFromSession(String sessionId, CurrencyPair currencyPair) {
+        String sessionKey = getSessionSubscriptionsKey(sessionId);
         String pairString = currencyPair.toString();
-        log.info("Removing pair {} from customer {}", pairString, customerId);
+        log.info("Removing pair {} from session {}", pairString, sessionId);
 
-        redisTemplate.opsForSet().remove(customerKey, pairString);
+        redisTemplate.opsForSet().remove(sessionKey, pairString);
     }
 
-    public Set<CurrencyPair> getCustomerSubscriptions(String customerKey) {
-        Set<String> pairStrings = redisTemplate.opsForSet().members(customerKey);
+    public Set<CurrencyPair> getSessionSubscriptions(String sessionKey) {
+        Set<String> pairStrings = redisTemplate.opsForSet().members(sessionKey);
 
         if (pairStrings == null || pairStrings.isEmpty()) {
             return new HashSet<>();
@@ -78,29 +78,29 @@ public class CryptoRateSubscriptionRedisRepository {
         return size != null ? size : 0;
     }
 
-    public Set<CurrencyPair> removeAllCustomerSubscriptions(String customerId) {
-        log.info("Removing all subscriptions for customer {}", customerId);
-        String customerKey = getCustomerSubscriptionsKey(customerId);
+    public Set<CurrencyPair> removeAllSessionSubscriptions(String sessionId) {
+        log.info("Removing all subscriptions for session {}", sessionId);
+        String sessionKey = getSessionSubscriptionsKey(sessionId);
 
-        Set<CurrencyPair> customerPairs = getCustomerSubscriptions(customerKey);
+        Set<CurrencyPair> sessionPairs = getSessionSubscriptions(sessionKey);
 
-        if (customerPairs.isEmpty()) {
+        if (sessionPairs.isEmpty()) {
             return new HashSet<>();
         }
 
-        customerPairs.forEach(pair -> removeCustomerFromPair(customerId, pair));
-        redisTemplate.delete(customerKey);
+        sessionPairs.forEach(pair -> removeSessionFromPair(sessionId, pair));
+        redisTemplate.delete(sessionKey);
 
-        log.info("Removed {} subscriptions for customer {}", customerPairs.size(), customerId);
-        return customerPairs;
+        log.info("Removed {} subscriptions for session {}", sessionPairs.size(), sessionId);
+        return sessionPairs;
     }
 
     private String getPairSubscribersKey(CurrencyPair currencyPair) {
         return String.format("%s.%s", PAIR_SUBSCRIBERS_PREFIX, currencyPair.toString());
     }
 
-    private String getCustomerSubscriptionsKey(String customerId) {
-        return String.format("%s.%s", CUSTOMER_SUBSCRIPTIONS_PREFIX, customerId);
+    private String getSessionSubscriptionsKey(String sessionId) {
+        return String.format("%s.%s", SESSION_SUBSCRIPTIONS_PREFIX, sessionId);
     }
 
 }

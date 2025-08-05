@@ -19,8 +19,8 @@ public class CryptoRateSubscriptionService {
     private final CryptoRateSubscriptionRedisRepository subscriptionRedisRepository;
     private final SessionManager sessionManager;
 
-    public void subscribe(String customerId, CurrencyPair currencyPair) {
-        log.info("Subscribing customer {} to currency pair {}", customerId, currencyPair);
+    public void subscribe(String sessionId, CurrencyPair currencyPair) {
+        log.info("Subscribing session {} to currency pair {}", sessionId, currencyPair);
 
         long subscribersBeforeAdd = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
 
@@ -29,21 +29,21 @@ public class CryptoRateSubscriptionService {
             enableRateStreaming(currencyPair);
         }
 
-        subscriptionRedisRepository.addCustomerToPair(customerId, currencyPair);
+        subscriptionRedisRepository.addSessionToPair(sessionId, currencyPair);
 
-        subscriptionRedisRepository.addPairToCustomer(customerId, currencyPair);
+        subscriptionRedisRepository.addPairToSession(sessionId, currencyPair);
 
         long totalSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
-        log.info("Customer {} subscribed to {}. Total subscribers for this pair: {}",
-                customerId, currencyPair, totalSubscribers);
+        log.info("Session {} subscribed to {}. Total subscribers for this pair: {}",
+                sessionId, currencyPair, totalSubscribers);
     }
 
-    public void unsubscribe(String customerId, CurrencyPair currencyPair) {
-        log.info("Unsubscribing customer {} from currency pair {}", customerId, currencyPair);
+    public void unsubscribe(String sessionId, CurrencyPair currencyPair) {
+        log.info("Unsubscribing session {} from currency pair {}", sessionId, currencyPair);
 
-        subscriptionRedisRepository.removeCustomerFromPair(customerId, currencyPair);
+        subscriptionRedisRepository.removeSessionFromPair(sessionId, currencyPair);
 
-        subscriptionRedisRepository.removePairFromCustomer(customerId, currencyPair);
+        subscriptionRedisRepository.removePairFromSession(sessionId, currencyPair);
 
         long remainingSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
 
@@ -52,31 +52,21 @@ public class CryptoRateSubscriptionService {
             disableRateStreaming(currencyPair);
         }
 
-        log.info("Customer {} unsubscribed from {}. Remaining subscribers for this pair: {}",
-                customerId, currencyPair, remainingSubscribers);
+        log.info("Session {} unsubscribed from {}. Remaining subscribers for this pair: {}",
+                sessionId, currencyPair, remainingSubscribers);
     }
 
     public void handleSessionDisconnect(String sessionId) {
-        var customerId = sessionManager.getCustomerBySession(sessionId);
-        if (customerId != null) {
-            handleCustomerDisconnect(customerId);
-            sessionManager.unregisterSession(sessionId);
-        }
-    }
+        Set<CurrencyPair> sessionPairs = subscriptionRedisRepository.removeAllSessionSubscriptions(sessionId);
 
-    public void handleCustomerDisconnect(String customerId) {
-        log.info("Handling disconnect for customer {}", customerId);
-
-        Set<CurrencyPair> customerPairs = subscriptionRedisRepository.removeAllCustomerSubscriptions(customerId);
-
-        if (customerPairs.isEmpty()) {
-            log.info("Customer {} had no subscriptions", customerId);
+        if (sessionPairs.isEmpty()) {
+            log.info("Session {} had no subscriptions", sessionId);
             return;
         }
-        disableRateStreamingIfApplicable(customerPairs);
+        disableRateStreamingIfApplicable(sessionPairs);
 
-        log.info("Cleaned up customer {} - removed {} subscriptions",
-                customerId, customerPairs.size());
+        sessionManager.unregisterSession(sessionId);
+        log.info("Cleaned up session {} - removed {} subscriptions", sessionId, sessionPairs.size());
     }
 
     private void disableRateStreamingIfApplicable(Set<CurrencyPair> currencyPairs) {
@@ -94,7 +84,7 @@ public class CryptoRateSubscriptionService {
                 log.info("Stopping rate streaming for {} ", pairsToDisable);
                 cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
             } catch (Exception ex) {
-                log.error("Failed to disable batch rate streaming for {}: {}", pairsToDisable, ex.getMessage());
+                log.error("Failed to disable rate streaming. Error : {}", ex.getMessage());
             }
         }
     }

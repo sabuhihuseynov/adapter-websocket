@@ -24,7 +24,7 @@ public class SessionManager {
 
     @PostConstruct
     public void initialize() {
-        log.info("Pod session manager initialized with ID: {}", POD_ID);
+        log.info("Session manager initialized with POD_ID: {}", POD_ID);
     }
 
     public void registerSession(String sessionId, String customerId) {
@@ -45,11 +45,6 @@ public class SessionManager {
 
         String sessionCustomerKey = getSessionToCustomerKey(sessionId);
         redisTemplate.delete(sessionCustomerKey);
-    }
-
-    public String getCustomerBySession(String sessionId) {
-        String sessionCustomerKey = getSessionToCustomerKey(sessionId);
-        return redisTemplate.opsForValue().get(sessionCustomerKey);
     }
 
     public String getPodSessionsKey() {
