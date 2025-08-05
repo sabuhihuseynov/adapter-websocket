@@ -13,10 +13,10 @@ databaseChangeLog:
                     primaryKey: true
                     nullable: false
               - column:
-                  name: from
+                  name: currency_from
                   type: varchar(50)
               - column:
-                  name: to
+                  name: currency_to
                   type: varchar(50)
               - column:
                   name: created_at

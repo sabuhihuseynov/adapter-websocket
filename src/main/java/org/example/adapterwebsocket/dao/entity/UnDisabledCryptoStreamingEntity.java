@@ -14,6 +14,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
 @Setter
@@ -29,21 +31,23 @@ public class UnDisabledCryptoStreamingEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "from")
-    private String from;
+    @Column(name = "currency_from")
+    private String currencyFrom;
 
-    @Column(name = "to")
-    private String to;
+    @Column(name = "currency_to")
+    private String currencyTo;
 
+    @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public UnDisabledCryptoStreamingEntity(String from, String to) {
-        this.from = from;
-        this.to = to;
+    public UnDisabledCryptoStreamingEntity(String currencyFrom, String currencyTo) {
+        this.currencyFrom = currencyFrom;
+        this.currencyTo = currencyTo;
     }
 
     @Override
@@ -56,14 +60,14 @@ public class UnDisabledCryptoStreamingEntity {
         }
         UnDisabledCryptoStreamingEntity that = (UnDisabledCryptoStreamingEntity) o;
         return Objects.equals(id, that.id)
-                && Objects.equals(from, that.from)
-                && Objects.equals(to, that.to)
+                && Objects.equals(currencyFrom, that.currencyFrom)
+                && Objects.equals(currencyTo, that.currencyTo)
                 && Objects.equals(createdAt, that.createdAt)
                 && Objects.equals(updatedAt, that.updatedAt);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, from, to, createdAt, updatedAt);
+        return Objects.hash(id, currencyFrom, currencyTo, createdAt, updatedAt);
     }
 }

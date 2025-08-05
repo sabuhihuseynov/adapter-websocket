@@ -1,14 +1,12 @@
 package org.example.adapterwebsocket.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.CryptoCurrencyClient;
 import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
 import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoStreamingEntity;
@@ -155,15 +153,15 @@ public class CryptoRateSubscriptionService {
             List<UnDisabledCryptoStreamingEntity> entities) {
         Set<UnDisabledCryptoStreamingEntity> entitiesToRemove = new HashSet<>();
 
-        for (UnDisabledCryptoStreamingEntity entity : entities) {
-            CurrencyPair pair = new CurrencyPair(entity.getFrom(), entity.getTo());
+        entities.forEach(entity -> {
+            CurrencyPair pair = new CurrencyPair(entity.getCurrencyFrom(), entity.getCurrencyTo());
             long subscribers = subscriptionRedisRepository.getPairSubscriberCount(pair);
 
             if (subscribers > 0) {
                 log.info("Pair {} has {} subscribers, marking for removal", pair, subscribers);
                 entitiesToRemove.add(entity);
             }
-        }
+        });
 
         if (!entitiesToRemove.isEmpty()) {
             unDisabledCryptoStreamingRepository.deleteAll(entitiesToRemove);
@@ -183,7 +181,7 @@ public class CryptoRateSubscriptionService {
 
     private void attemptBulkDisableForEntities(List<UnDisabledCryptoStreamingEntity> entities) {
         Set<CurrencyPair> pairsToDisable = entities.stream()
-                .map(entity -> new CurrencyPair(entity.getFrom(), entity.getTo()))
+                .map(entity -> new CurrencyPair(entity.getCurrencyFrom(), entity.getCurrencyTo()))
                 .collect(Collectors.toSet());
 
         try {
