@@ -26,4 +26,4 @@ databaseChangeLog:
                   name: updated_at
                   type: TIMESTAMP(3)
                   defaultValueComputed: now()
-            remarks: Table to store crypto currencies' information
+            remarks: Table to store undisabled crypto rate streaming for retry

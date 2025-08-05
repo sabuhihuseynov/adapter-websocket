@@ -1,4 +1,4 @@
-package org.example.adapterwebsocket.dao.repository.cache;
+package org.example.adapterwebsocket.dao.repository;
 
 import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoStreamingEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
