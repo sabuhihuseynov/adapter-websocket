@@ -62,6 +62,7 @@ public class CryptoRateSubscriptionService {
 
     public void handleSessionDisconnect(String sessionId) {
         Set<CurrencyPair> currencyPairs = subscriptionRedisRepository.removeAllSessionSubscriptions(sessionId);
+        sessionManager.unregisterSession(sessionId);
 
         if (currencyPairs.isEmpty()) {
             log.info("Session {} had no subscriptions", sessionId);
@@ -69,7 +70,6 @@ public class CryptoRateSubscriptionService {
         }
         disableRateStreamingIfApplicable(currencyPairs);
 
-        sessionManager.unregisterSession(sessionId);
         log.info("Cleaned up session {} - removed {} subscriptions", sessionId, currencyPairs.size());
     }
 

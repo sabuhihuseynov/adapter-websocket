@@ -80,8 +80,8 @@ public class CryptoRateSubscriptionRedisRepository {
 
     public Set<CurrencyPair> removeAllSessionSubscriptions(String sessionId) {
         log.info("Removing all subscriptions for session {}", sessionId);
-        String sessionKey = getSessionSubscriptionsKey(sessionId);
 
+        String sessionKey = getSessionSubscriptionsKey(sessionId);
         Set<CurrencyPair> currencyPairs = getSessionSubscriptions(sessionKey);
 
         if (currencyPairs.isEmpty()) {
