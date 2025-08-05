@@ -67,8 +67,6 @@ public class CryptoRateSubscriptionService {
             return;
         }
         disableRateStreamingIfApplicable(currencyPairs);
-
-        log.info("Cleaned up session {} - removed {} subscriptions", sessionId, currencyPairs.size());
     }
 
     private void disableRateStreamingIfApplicable(Set<CurrencyPair> currencyPairs) {
@@ -116,9 +114,9 @@ public class CryptoRateSubscriptionService {
 
         try {
             cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(currencyPairs, false));
-            log.info("Successfully disabled rate streaming for {} pairs", currencyPairs.size());
+            log.info("Successfully disabled rate streaming for {} pairs", currencyPairs);
         } catch (Exception e) {
-            log.error("Failed to disable rate streaming for {} pairs: {}", currencyPairs.size(), e.getMessage());
+            log.error("Failed to disable rate streaming for {} pairs: {}", currencyPairs, e.getMessage());
             saveForRetry(currencyPairs);
         }
     }
@@ -133,7 +131,7 @@ public class CryptoRateSubscriptionService {
                 .toList();
 
         unDisabledCryptoStreamingRepository.saveAll(entities);
-        log.info("Saved {} currency pairs for retry", currencyPairs.size());
+        log.info("Saved {} currency pairs for retry", currencyPairs);
     }
 
     public void processFailedDisables(List<UnDisabledCryptoStreamingEntity> retryDisableEntities) {
@@ -158,14 +156,13 @@ public class CryptoRateSubscriptionService {
             long subscribers = subscriptionRedisRepository.getPairSubscriberCount(pair);
 
             if (subscribers > 0) {
-                log.info("Pair {} has {} subscribers, marking for removal", pair, subscribers);
+                log.info("Pair {} has {} subscribers, marking for removal for retry", pair, subscribers);
                 entitiesToRemove.add(entity);
             }
         });
 
         if (!entitiesToRemove.isEmpty()) {
             unDisabledCryptoStreamingRepository.deleteAll(entitiesToRemove);
-            log.info("Removed {} tasks for reactivated pairs", entitiesToRemove.size());
         }
 
         return entitiesToRemove;
@@ -188,7 +185,7 @@ public class CryptoRateSubscriptionService {
             performBulkDisable(pairsToDisable);
             deleteSuccessfulDisableEntities(entities);
         } catch (Exception e) {
-            log.warn("Failed to disable streaming for {} pairs: {}", pairsToDisable.size(), e.getMessage());
+            log.warn("Failed to disable streaming for {} pairs: {}", pairsToDisable, e.getMessage());
             handleFailedDisableEntities(entities);
         }
     }

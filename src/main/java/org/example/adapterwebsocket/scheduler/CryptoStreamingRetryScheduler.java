@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.example.adapterwebsocket.dao.repository.cache.UnDisabledCryptoStreamingRepository;
+import org.example.adapterwebsocket.dao.repository.UnDisabledCryptoStreamingRepository;
 import org.example.adapterwebsocket.service.CryptoRateSubscriptionService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

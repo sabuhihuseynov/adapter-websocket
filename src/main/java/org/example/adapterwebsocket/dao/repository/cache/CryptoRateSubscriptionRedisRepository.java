@@ -26,7 +26,7 @@ public class CryptoRateSubscriptionRedisRepository {
 
     public void addSessionToPair(String sessionId, CurrencyPair currencyPair) {
         String pairKey = getPairSubscribersKey(currencyPair);
-        log.info("Adding session {} to pair {}", sessionId, currencyPair);
+        log.debug("Adding session {} to pair {}", sessionId, currencyPair);
 
         redisTemplate.opsForSet().add(pairKey, sessionId);
     }
@@ -34,14 +34,14 @@ public class CryptoRateSubscriptionRedisRepository {
     public void addPairToSession(String sessionId, CurrencyPair currencyPair) {
         String sessionKey = getSessionSubscriptionsKey(sessionId);
         String pairString = currencyPair.toString();
-        log.info("Adding pair {} to session {}", pairString, sessionId);
+        log.debug("Adding pair {} to session {}", pairString, sessionId);
 
         redisTemplate.opsForSet().add(sessionKey, pairString);
     }
 
     public void removeSessionFromPair(String sessionId, CurrencyPair currencyPair) {
         String pairKey = getPairSubscribersKey(currencyPair);
-        log.info("Removing session {} from pair {}", sessionId, currencyPair);
+        log.debug("Removing session {} from pair {}", sessionId, currencyPair);
 
         redisTemplate.opsForSet().remove(pairKey, sessionId);
     }
@@ -49,7 +49,7 @@ public class CryptoRateSubscriptionRedisRepository {
     public void removePairFromSession(String sessionId, CurrencyPair currencyPair) {
         String sessionKey = getSessionSubscriptionsKey(sessionId);
         String pairString = currencyPair.toString();
-        log.info("Removing pair {} from session {}", pairString, sessionId);
+        log.debug("Removing pair {} from session {}", pairString, sessionId);
 
         redisTemplate.opsForSet().remove(sessionKey, pairString);
     }
@@ -79,7 +79,7 @@ public class CryptoRateSubscriptionRedisRepository {
     }
 
     public Set<CurrencyPair> removeAllSessionSubscriptions(String sessionId) {
-        log.info("Removing all subscriptions for session {}", sessionId);
+        log.debug("Removing all subscriptions for session {}", sessionId);
 
         String sessionKey = getSessionSubscriptionsKey(sessionId);
         Set<CurrencyPair> currencyPairs = getSessionSubscriptions(sessionKey);
@@ -91,7 +91,7 @@ public class CryptoRateSubscriptionRedisRepository {
         currencyPairs.forEach(pair -> removeSessionFromPair(sessionId, pair));
         redisTemplate.delete(sessionKey);
 
-        log.info("Removed {} subscriptions for session {}", currencyPairs.size(), sessionId);
+        log.debug("Removed {} subscriptions for session {}", currencyPairs.size(), sessionId);
         return currencyPairs;
     }
 
