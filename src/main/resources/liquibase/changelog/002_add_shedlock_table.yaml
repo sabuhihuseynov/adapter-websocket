@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002_add_shedlock_table
+      author: Sabuhi Huseynov
+      changes:
+        - createTable:
+            tableName: shedlock
+            columns:
+              - column:
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_name_id
+                  name: name
+                  type: VARCHAR(64)
+              - column:
+                  name: lock_until
+                  type: datetime
+              - column:
+                  name: locked_at
+                  type: datetime
+              - column:
+                  name: locked_by
+                  type: VARCHAR(255)

@@ -2,11 +2,18 @@ package org.example.adapterwebsocket.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.example.adapterwebsocket.client.CryptoCurrencyClient;
 import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
+import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoStreamingEntity;
 import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
+import org.example.adapterwebsocket.dao.repository.cache.UnDisabledCryptoStreamingRepository;
 import org.example.adapterwebsocket.model.CurrencyPair;
 import org.springframework.stereotype.Service;
 
@@ -17,20 +24,19 @@ public class CryptoRateSubscriptionService {
 
     private final CryptoCurrencyClient cryptoCurrencyClient;
     private final CryptoRateSubscriptionRedisRepository subscriptionRedisRepository;
+    private final UnDisabledCryptoStreamingRepository unDisabledCryptoStreamingRepository;
     private final SessionManager sessionManager;
 
     public void subscribe(String sessionId, CurrencyPair currencyPair) {
         log.info("Subscribing session {} to currency pair {}", sessionId, currencyPair);
 
         long subscribersBeforeAdd = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
-
         if (subscribersBeforeAdd == 0) {
             log.info("First subscriber for {}. Starting rate streaming", currencyPair);
             enableRateStreaming(currencyPair);
         }
 
         subscriptionRedisRepository.addSessionToPair(sessionId, currencyPair);
-
         subscriptionRedisRepository.addPairToSession(sessionId, currencyPair);
 
         long totalSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
@@ -42,11 +48,9 @@ public class CryptoRateSubscriptionService {
         log.info("Unsubscribing session {} from currency pair {}", sessionId, currencyPair);
 
         subscriptionRedisRepository.removeSessionFromPair(sessionId, currencyPair);
-
         subscriptionRedisRepository.removePairFromSession(sessionId, currencyPair);
 
         long remainingSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
-
         if (remainingSubscribers == 0) {
             log.info("No more subscribers for {}. Stopping rate streaming", currencyPair);
             disableRateStreaming(currencyPair);
@@ -80,12 +84,7 @@ public class CryptoRateSubscriptionService {
         });
 
         if (!pairsToDisable.isEmpty()) {
-            try {
-                log.info("Stopping rate streaming for {} ", pairsToDisable);
-                cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
-            } catch (Exception ex) {
-                log.error("Failed to disable rate streaming. Error : {}", ex.getMessage());
-            }
+            disableRateStreaming(pairsToDisable);
         }
     }
 
@@ -102,19 +101,115 @@ public class CryptoRateSubscriptionService {
             var request = new RateStreamControlRequest(Set.of(currencyPair), true);
             cryptoCurrencyClient.controlRateStreaming(request);
             log.info("Successfully enabled rate streaming for {}", currencyPair);
-        } catch (Exception e) {
-            log.error("Failed to enable rate streaming for {}: {}", currencyPair, e.getMessage());
+        } catch (Exception ex) {
+            log.error("Failed to enable rate streaming for {}: {}", currencyPair, ex.getMessage());
+            throw ex;
         }
     }
 
     private void disableRateStreaming(CurrencyPair currencyPair) {
-        try {
-            var request = new RateStreamControlRequest(Set.of(currencyPair), false);
-            cryptoCurrencyClient.controlRateStreaming(request);
-            log.info("Successfully disabled rate streaming for {}", currencyPair);
-        } catch (Exception e) {
-            log.error("Failed to disable rate streaming for {}: {}", currencyPair, e.getMessage());
+        disableRateStreaming(Set.of(currencyPair));
+    }
+
+    private void disableRateStreaming(Set<CurrencyPair> currencyPairs) {
+        if (currencyPairs.isEmpty()) {
+            return;
         }
+
+        try {
+            cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(currencyPairs, false));
+            log.info("Successfully disabled rate streaming for {} pairs", currencyPairs.size());
+        } catch (Exception e) {
+            log.error("Failed to disable rate streaming for {} pairs: {}", currencyPairs.size(), e.getMessage());
+            saveForRetry(currencyPairs);
+        }
+    }
+
+    private void saveForRetry(Set<CurrencyPair> currencyPairs) {
+        if (currencyPairs.isEmpty()) {
+            return;
+        }
+
+        List<UnDisabledCryptoStreamingEntity> entities = currencyPairs.stream()
+                .map(pair -> new UnDisabledCryptoStreamingEntity(pair.getFrom(), pair.getTo()))
+                .toList();
+
+        unDisabledCryptoStreamingRepository.saveAll(entities);
+        log.info("Saved {} currency pairs for retry", currencyPairs.size());
+    }
+
+    public void processFailedDisables(List<UnDisabledCryptoStreamingEntity> retryDisableEntities) {
+        if (retryDisableEntities.isEmpty()) {
+            return;
+        }
+
+        var entitiesToRemove = findAndRemoveReactivatedEntities(retryDisableEntities);
+        var remainingEntities = getRemainingEntities(retryDisableEntities, entitiesToRemove);
+
+        if (!remainingEntities.isEmpty()) {
+            attemptBulkDisableForEntities(remainingEntities);
+        }
+    }
+
+    private Set<UnDisabledCryptoStreamingEntity> findAndRemoveReactivatedEntities(
+            List<UnDisabledCryptoStreamingEntity> entities) {
+        Set<UnDisabledCryptoStreamingEntity> entitiesToRemove = new HashSet<>();
+
+        for (UnDisabledCryptoStreamingEntity entity : entities) {
+            CurrencyPair pair = new CurrencyPair(entity.getFrom(), entity.getTo());
+            long subscribers = subscriptionRedisRepository.getPairSubscriberCount(pair);
+
+            if (subscribers > 0) {
+                log.info("Pair {} has {} subscribers, marking for removal", pair, subscribers);
+                entitiesToRemove.add(entity);
+            }
+        }
+
+        if (!entitiesToRemove.isEmpty()) {
+            unDisabledCryptoStreamingRepository.deleteAll(entitiesToRemove);
+            log.info("Removed {} tasks for reactivated pairs", entitiesToRemove.size());
+        }
+
+        return entitiesToRemove;
+    }
+
+    private List<UnDisabledCryptoStreamingEntity> getRemainingEntities(
+            List<UnDisabledCryptoStreamingEntity> allEntities,
+            Set<UnDisabledCryptoStreamingEntity> removedEntities) {
+        return allEntities.stream()
+                .filter(entity -> !removedEntities.contains(entity))
+                .toList();
+    }
+
+    private void attemptBulkDisableForEntities(List<UnDisabledCryptoStreamingEntity> entities) {
+        Set<CurrencyPair> pairsToDisable = entities.stream()
+                .map(entity -> new CurrencyPair(entity.getFrom(), entity.getTo()))
+                .collect(Collectors.toSet());
+
+        try {
+            performBulkDisable(pairsToDisable);
+            deleteSuccessfulDisableEntities(entities);
+        } catch (Exception e) {
+            log.warn("Failed to disable streaming for {} pairs: {}", pairsToDisable.size(), e.getMessage());
+            handleFailedDisableEntities(entities);
+        }
+    }
+
+    private void performBulkDisable(Set<CurrencyPair> pairsToDisable) {
+        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
+        log.info("Successfully disabled streaming for {} pairs", pairsToDisable.size());
+    }
+
+    private void deleteSuccessfulDisableEntities(List<UnDisabledCryptoStreamingEntity> entities) {
+        unDisabledCryptoStreamingRepository.deleteAll(entities);
+        log.info("Deleted {} cleanup tasks after successful bulk disable", entities.size());
+    }
+
+    private void handleFailedDisableEntities(List<UnDisabledCryptoStreamingEntity> entities) {
+
+        entities.forEach(entity -> entity.setUpdatedAt(LocalDateTime.now()));
+        unDisabledCryptoStreamingRepository.saveAll(entities);
+        log.info("Updated {} tasks to retry later", entities.size());
     }
 
 }

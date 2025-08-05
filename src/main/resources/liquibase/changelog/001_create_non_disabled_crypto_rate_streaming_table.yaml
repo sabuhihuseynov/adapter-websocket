@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001_create_undisabled_crypto_streaming_table
+      author: Sabuhi Huseynov
+      changes:
+        - createTable:
+            tableName: undisabled_crypto_streaming
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: from
+                  type: varchar(50)
+              - column:
+                  name: to
+                  type: varchar(50)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP(3)
+                  defaultValueComputed: now()
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP(3)
+                  defaultValueComputed: now()
+            remarks: Table to store crypto currencies' information

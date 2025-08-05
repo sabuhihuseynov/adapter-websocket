@@ -10,6 +10,16 @@ logging:
 spring:
   application:
     name: adapter-websocket
+  liquibase:
+    change-log: classpath:liquibase/changelog-master.yaml
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/dbs_websocket
+    username: postgres
+    password: postgres
+    hikari:
+      maximum-pool-size: 5
   rabbitmq:
     host: localhost
     port: 5672
@@ -20,3 +30,5 @@ spring:
       host: localhost
       port: 6379
       password:
+application:
+  crypto-rate-streaming-disable-scheduler-cron: "0 */3 * * * ?"
