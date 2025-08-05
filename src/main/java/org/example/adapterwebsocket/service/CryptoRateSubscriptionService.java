@@ -57,16 +57,16 @@ public class CryptoRateSubscriptionService {
     }
 
     public void handleSessionDisconnect(String sessionId) {
-        Set<CurrencyPair> sessionPairs = subscriptionRedisRepository.removeAllSessionSubscriptions(sessionId);
+        Set<CurrencyPair> currencyPairs = subscriptionRedisRepository.removeAllSessionSubscriptions(sessionId);
 
-        if (sessionPairs.isEmpty()) {
+        if (currencyPairs.isEmpty()) {
             log.info("Session {} had no subscriptions", sessionId);
             return;
         }
-        disableRateStreamingIfApplicable(sessionPairs);
+        disableRateStreamingIfApplicable(currencyPairs);
 
         sessionManager.unregisterSession(sessionId);
-        log.info("Cleaned up session {} - removed {} subscriptions", sessionId, sessionPairs.size());
+        log.info("Cleaned up session {} - removed {} subscriptions", sessionId, currencyPairs.size());
     }
 
     private void disableRateStreamingIfApplicable(Set<CurrencyPair> currencyPairs) {

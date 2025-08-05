@@ -20,7 +20,7 @@ public class CryptoRateSubscriptionRestController {
     @GetMapping("/check")
     public CryptoRateSubscriptionCheckResponse hasPairSubscription(CurrencyPair currencyPair) {
         boolean hasActiveSubscriptions = subscriptionService.hasPairSubscription(currencyPair);
-        log.debug("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
+        log.info("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
         return new CryptoRateSubscriptionCheckResponse(hasActiveSubscriptions);
     }
 }

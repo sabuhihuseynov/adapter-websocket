@@ -82,17 +82,17 @@ public class CryptoRateSubscriptionRedisRepository {
         log.info("Removing all subscriptions for session {}", sessionId);
         String sessionKey = getSessionSubscriptionsKey(sessionId);
 
-        Set<CurrencyPair> sessionPairs = getSessionSubscriptions(sessionKey);
+        Set<CurrencyPair> currencyPairs = getSessionSubscriptions(sessionKey);
 
-        if (sessionPairs.isEmpty()) {
+        if (currencyPairs.isEmpty()) {
             return new HashSet<>();
         }
 
-        sessionPairs.forEach(pair -> removeSessionFromPair(sessionId, pair));
+        currencyPairs.forEach(pair -> removeSessionFromPair(sessionId, pair));
         redisTemplate.delete(sessionKey);
 
-        log.info("Removed {} subscriptions for session {}", sessionPairs.size(), sessionId);
-        return sessionPairs;
+        log.info("Removed {} subscriptions for session {}", currencyPairs.size(), sessionId);
+        return currencyPairs;
     }
 
     private String getPairSubscribersKey(CurrencyPair currencyPair) {
