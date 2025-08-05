@@ -9,7 +9,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
-    @Bean
+    @Bean(name = "cryptoRateSubscriptionRedisTemplate")
     public RedisTemplate<String, String> cryptoRateSubscriptionRedisTemplate(
             RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, String> template = new RedisTemplate<>();

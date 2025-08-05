@@ -1,8 +1,5 @@
 package org.example.adapterwebsocket.service;
 
-import static org.example.adapterwebsocket.service.PodSessionManager.POD_ID;
-
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.util.HashSet;
@@ -19,24 +16,24 @@ import org.springframework.stereotype.Service;
 public class CryptoRateSubscriptionService {
 
     private final CryptoCurrencyClient cryptoCurrencyClient;
-    private final CryptoRateSubscriptionRedisRepository cryptoRateSubscriptionRedisRepository;
-    private final PodSessionManager podSessionManager;
+    private final CryptoRateSubscriptionRedisRepository subscriptionRedisRepository;
+    private final SessionManager sessionManager;
 
     public void subscribe(String customerId, CurrencyPair currencyPair) {
         log.info("Subscribing customer {} to currency pair {}", customerId, currencyPair);
 
-        long subscribersBeforeAdd = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
+        long subscribersBeforeAdd = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
 
         if (subscribersBeforeAdd == 0) {
             log.info("First subscriber for {}. Starting rate streaming", currencyPair);
             enableRateStreaming(currencyPair);
         }
 
-        cryptoRateSubscriptionRedisRepository.addCustomerToPair(customerId, currencyPair);
+        subscriptionRedisRepository.addCustomerToPair(customerId, currencyPair);
 
-        cryptoRateSubscriptionRedisRepository.addPairToCustomer(customerId, currencyPair);
+        subscriptionRedisRepository.addPairToCustomer(customerId, currencyPair);
 
-        long totalSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
+        long totalSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
         log.info("Customer {} subscribed to {}. Total subscribers for this pair: {}",
                 customerId, currencyPair, totalSubscribers);
     }
@@ -44,11 +41,11 @@ public class CryptoRateSubscriptionService {
     public void unsubscribe(String customerId, CurrencyPair currencyPair) {
         log.info("Unsubscribing customer {} from currency pair {}", customerId, currencyPair);
 
-        cryptoRateSubscriptionRedisRepository.removeCustomerFromPair(customerId, currencyPair);
+        subscriptionRedisRepository.removeCustomerFromPair(customerId, currencyPair);
 
-        cryptoRateSubscriptionRedisRepository.removePairFromCustomer(customerId, currencyPair);
+        subscriptionRedisRepository.removePairFromCustomer(customerId, currencyPair);
 
-        long remainingSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(currencyPair);
+        long remainingSubscribers = subscriptionRedisRepository.getPairSubscriberCount(currencyPair);
 
         if (remainingSubscribers == 0) {
             log.info("No more subscribers for {}. Stopping rate streaming", currencyPair);
@@ -60,18 +57,17 @@ public class CryptoRateSubscriptionService {
     }
 
     public void handleSessionDisconnect(String sessionId) {
-        var customerId = podSessionManager.getCustomerBySession(sessionId);
+        var customerId = sessionManager.getCustomerBySession(sessionId);
         if (customerId != null) {
             handleCustomerDisconnect(customerId);
-            podSessionManager.unregisterSession(sessionId);
+            sessionManager.unregisterSession(sessionId);
         }
     }
 
     public void handleCustomerDisconnect(String customerId) {
         log.info("Handling disconnect for customer {}", customerId);
 
-        Set<CurrencyPair> customerPairs = cryptoRateSubscriptionRedisRepository
-                .removeAllCustomerSubscriptions(customerId);
+        Set<CurrencyPair> customerPairs = subscriptionRedisRepository.removeAllCustomerSubscriptions(customerId);
 
         if (customerPairs.isEmpty()) {
             log.info("Customer {} had no subscriptions", customerId);
@@ -87,23 +83,26 @@ public class CryptoRateSubscriptionService {
         Set<CurrencyPair> pairsToDisable = new HashSet<>();
 
         currencyPairs.forEach(pair -> {
-            long remainingSubscribers = cryptoRateSubscriptionRedisRepository.getPairSubscriberCount(pair);
+            long remainingSubscribers = subscriptionRedisRepository.getPairSubscriberCount(pair);
             if (remainingSubscribers == 0) {
                 pairsToDisable.add(pair);
-                log.info("Pair {} now has no subscribers", pair);
             }
         });
 
         if (!pairsToDisable.isEmpty()) {
-            log.info("Stopping rate streaming for {} pairs", pairsToDisable.size());
-            cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
+            try {
+                log.info("Stopping rate streaming for {} ", pairsToDisable);
+                cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
+            } catch (Exception ex) {
+                log.error("Failed to disable batch rate streaming for {}: {}", pairsToDisable, ex.getMessage());
+            }
         }
     }
 
     public boolean hasPairSubscription(CurrencyPair currencyPair) {
-        boolean hasActiveSubscriptions = cryptoRateSubscriptionRedisRepository.hasPairSubscribers(currencyPair);
+        boolean hasActiveSubscriptions = subscriptionRedisRepository.hasPairSubscribers(currencyPair);
 
-        log.debug("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
+        log.info("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
 
         return hasActiveSubscriptions;
     }
@@ -128,21 +127,4 @@ public class CryptoRateSubscriptionService {
         }
     }
 
-    @PreDestroy
-    public void cleanup() {
-        log.info("Pod {} shutting down - cleaning up sessions (crypto rate subscription handling)", POD_ID);
-        cleanupPodSessions();
-    }
-
-    private void cleanupPodSessions() {
-        Set<String> sessions = podSessionManager.getActiveSessionsForPod();
-
-        if (sessions != null && !sessions.isEmpty()) {
-            log.info("Cleaning up {} sessions for pod {}", sessions.size(), POD_ID);
-
-            sessions.forEach(this::handleSessionDisconnect);
-            podSessionManager.getActiveSessionsForPod();
-            podSessionManager.removePodSessions();
-        }
-    }
 }

@@ -4,9 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.AuthClient;
 import org.example.adapterwebsocket.client.model.UserTokenPayload;
-import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
 import org.example.adapterwebsocket.model.User;
-import org.example.adapterwebsocket.service.PodSessionManager;
+import org.example.adapterwebsocket.service.SessionManager;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -21,7 +20,7 @@ import org.springframework.stereotype.Component;
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final AuthClient authClient;
-    private final PodSessionManager podSessionManager;
+    private final SessionManager sessionManager;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -39,7 +38,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             String sessionId = accessor.getSessionId();
             String customerId = userTokenPayload.getCustomerId();
 
-            podSessionManager.registerSession(sessionId, customerId);
+            sessionManager.registerSession(sessionId, customerId);
 
             accessor.setUser(new User(userTokenPayload.getUserId(), customerId, userTokenPayload.getIndividualId()));
 
