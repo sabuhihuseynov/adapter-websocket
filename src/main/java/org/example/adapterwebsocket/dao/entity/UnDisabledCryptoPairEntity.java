@@ -24,8 +24,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "undisabled_crypto_streaming")
-public class UnDisabledCryptoStreamingEntity {
+@Table(name = "undisabled_crypto_pairs")
+public class UnDisabledCryptoPairEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,7 +45,7 @@ public class UnDisabledCryptoStreamingEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public UnDisabledCryptoStreamingEntity(String currencyFrom, String currencyTo) {
+    public UnDisabledCryptoPairEntity(String currencyFrom, String currencyTo) {
         this.currencyFrom = currencyFrom;
         this.currencyTo = currencyTo;
     }
@@ -58,7 +58,7 @@ public class UnDisabledCryptoStreamingEntity {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        UnDisabledCryptoStreamingEntity that = (UnDisabledCryptoStreamingEntity) o;
+        UnDisabledCryptoPairEntity that = (UnDisabledCryptoPairEntity) o;
         return Objects.equals(id, that.id)
                 && Objects.equals(currencyFrom, that.currencyFrom)
                 && Objects.equals(currencyTo, that.currencyTo)

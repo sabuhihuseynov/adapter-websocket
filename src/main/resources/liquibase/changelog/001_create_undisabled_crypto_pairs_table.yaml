@@ -1,10 +1,10 @@
 databaseChangeLog:
   - changeSet:
-      id: 001_create_undisabled_crypto_streaming_table
+      id: 001_create_undisabled_crypto_pairs_table
       author: Sabuhi Huseynov
       changes:
         - createTable:
-            tableName: undisabled_crypto_streaming
+            tableName: undisabled_crypto_pairs
             columns:
               - column:
                   name: id

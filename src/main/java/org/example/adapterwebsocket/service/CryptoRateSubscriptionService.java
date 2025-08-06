@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.CryptoCurrencyClient;
 import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
-import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoStreamingEntity;
-import org.example.adapterwebsocket.dao.repository.UnDisabledCryptoStreamingRepository;
+import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoPairEntity;
+import org.example.adapterwebsocket.dao.repository.UnDisabledCryptoPairRepository;
 import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
 import org.example.adapterwebsocket.model.CurrencyPair;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class CryptoRateSubscriptionService {
 
     private final CryptoCurrencyClient cryptoCurrencyClient;
     private final CryptoRateSubscriptionRedisRepository subscriptionRedisRepository;
-    private final UnDisabledCryptoStreamingRepository unDisabledCryptoStreamingRepository;
+    private final UnDisabledCryptoPairRepository unDisabledCryptoPairRepository;
     private final SessionManager sessionManager;
 
     public void subscribe(String sessionId, CurrencyPair currencyPair) {
@@ -126,15 +126,15 @@ public class CryptoRateSubscriptionService {
             return;
         }
 
-        List<UnDisabledCryptoStreamingEntity> entities = currencyPairs.stream()
-                .map(pair -> new UnDisabledCryptoStreamingEntity(pair.getFrom(), pair.getTo()))
+        List<UnDisabledCryptoPairEntity> entities = currencyPairs.stream()
+                .map(pair -> new UnDisabledCryptoPairEntity(pair.getFrom(), pair.getTo()))
                 .toList();
 
-        unDisabledCryptoStreamingRepository.saveAll(entities);
+        unDisabledCryptoPairRepository.saveAll(entities);
         log.info("Saved {} currency pairs for retry", currencyPairs);
     }
 
-    public void processFailedDisables(List<UnDisabledCryptoStreamingEntity> retryDisableEntities) {
+    public void processFailedDisables(List<UnDisabledCryptoPairEntity> retryDisableEntities) {
         if (retryDisableEntities.isEmpty()) {
             return;
         }
@@ -147,9 +147,9 @@ public class CryptoRateSubscriptionService {
         }
     }
 
-    private Set<UnDisabledCryptoStreamingEntity> findAndRemoveReactivatedEntities(
-            List<UnDisabledCryptoStreamingEntity> entities) {
-        Set<UnDisabledCryptoStreamingEntity> entitiesToRemove = new HashSet<>();
+    private Set<UnDisabledCryptoPairEntity> findAndRemoveReactivatedEntities(
+            List<UnDisabledCryptoPairEntity> entities) {
+        Set<UnDisabledCryptoPairEntity> entitiesToRemove = new HashSet<>();
 
         entities.forEach(entity -> {
             CurrencyPair pair = new CurrencyPair(entity.getCurrencyFrom(), entity.getCurrencyTo());
@@ -162,21 +162,21 @@ public class CryptoRateSubscriptionService {
         });
 
         if (!entitiesToRemove.isEmpty()) {
-            unDisabledCryptoStreamingRepository.deleteAll(entitiesToRemove);
+            unDisabledCryptoPairRepository.deleteAll(entitiesToRemove);
         }
 
         return entitiesToRemove;
     }
 
-    private List<UnDisabledCryptoStreamingEntity> getRemainingEntities(
-            List<UnDisabledCryptoStreamingEntity> allEntities,
-            Set<UnDisabledCryptoStreamingEntity> removedEntities) {
+    private List<UnDisabledCryptoPairEntity> getRemainingEntities(
+            List<UnDisabledCryptoPairEntity> allEntities,
+            Set<UnDisabledCryptoPairEntity> removedEntities) {
         return allEntities.stream()
                 .filter(entity -> !removedEntities.contains(entity))
                 .toList();
     }
 
-    private void attemptBulkDisableForEntities(List<UnDisabledCryptoStreamingEntity> entities) {
+    private void attemptBulkDisableForEntities(List<UnDisabledCryptoPairEntity> entities) {
         Set<CurrencyPair> pairsToDisable = entities.stream()
                 .map(entity -> new CurrencyPair(entity.getCurrencyFrom(), entity.getCurrencyTo()))
                 .collect(Collectors.toSet());
@@ -195,15 +195,15 @@ public class CryptoRateSubscriptionService {
         log.info("Successfully disabled streaming for {} pairs", pairsToDisable.size());
     }
 
-    private void deleteSuccessfulDisableEntities(List<UnDisabledCryptoStreamingEntity> entities) {
-        unDisabledCryptoStreamingRepository.deleteAll(entities);
+    private void deleteSuccessfulDisableEntities(List<UnDisabledCryptoPairEntity> entities) {
+        unDisabledCryptoPairRepository.deleteAll(entities);
         log.info("Deleted {} cleanup tasks after successful bulk disable", entities.size());
     }
 
-    private void handleFailedDisableEntities(List<UnDisabledCryptoStreamingEntity> entities) {
+    private void handleFailedDisableEntities(List<UnDisabledCryptoPairEntity> entities) {
 
         entities.forEach(entity -> entity.setUpdatedAt(LocalDateTime.now()));
-        unDisabledCryptoStreamingRepository.saveAll(entities);
+        unDisabledCryptoPairRepository.saveAll(entities);
         log.info("Updated {} tasks to retry later", entities.size());
     }
 
