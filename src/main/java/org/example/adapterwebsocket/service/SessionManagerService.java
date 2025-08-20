@@ -22,7 +22,7 @@ public class SessionManagerService {
 
     private static final String POD_ID = UUID.randomUUID().toString().replace("-", "");
     private static final String POD_SESSIONS_PREFIX = "dbs.websocket.pod.sessions";
-    private static final String SESSION_TO_CUSTOMER_PREFIX = "dbs.websocket.session.customer";
+    private static final String SESSION_TO_USER_PREFIX = "dbs.websocket.session.user";
 
     private final ConcurrentHashMap<String, WebSocketSession> webSocketSessions = new ConcurrentHashMap<>();
     private final RedisTemplate<String, String> redisTemplate;
@@ -45,7 +45,7 @@ public class SessionManagerService {
         String podSessionsKey = getPodSessionsKey();
         redisTemplate.opsForSet().add(podSessionsKey, sessionId);
 
-        String sessionCustomerKey = getSessionToCustomerKey(sessionId);
+        String sessionCustomerKey = getSessionToUserKey(sessionId);
         redisTemplate.opsForValue().set(sessionCustomerKey, customerId);
     }
 
@@ -55,7 +55,7 @@ public class SessionManagerService {
         String podSessionsKey = getPodSessionsKey();
         redisTemplate.opsForSet().remove(podSessionsKey, sessionId);
 
-        String sessionCustomerKey = getSessionToCustomerKey(sessionId);
+        String sessionCustomerKey = getSessionToUserKey(sessionId);
         redisTemplate.delete(sessionCustomerKey);
 
         removeWebSocketSession(sessionId);
@@ -80,7 +80,6 @@ public class SessionManagerService {
             } catch (IOException e) {
                 log.error("Failed to close WebSocket session {}: {}", sessionId, e.getMessage());
             }
-            webSocketSessions.remove(sessionId);
         }
     }
 
@@ -101,7 +100,7 @@ public class SessionManagerService {
         return String.format("%s.%s", POD_SESSIONS_PREFIX, POD_ID);
     }
 
-    public String getSessionToCustomerKey(String sessionId) {
-        return String.format("%s.%s", SESSION_TO_CUSTOMER_PREFIX, sessionId);
+    public String getSessionToUserKey(String sessionId) {
+        return String.format("%s.%s", SESSION_TO_USER_PREFIX, sessionId);
     }
 }

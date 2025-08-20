@@ -57,8 +57,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
             @Override
             public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
-                eventPublisher.publishEvent(new WebSocketConnectionEstablishedEvent(this, session));
                 super.afterConnectionEstablished(session);
+                eventPublisher.publishEvent(new WebSocketConnectionEstablishedEvent(this, session));
             }
 
         });

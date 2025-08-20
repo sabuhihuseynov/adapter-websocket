@@ -31,13 +31,9 @@ public class WebSocketEventListener {
     public void handleWebSocketConnectListener(SessionConnectEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         var sessionId = headerAccessor.getSessionId();
-        String customerId = null;
+        String userId = (headerAccessor.getUser() instanceof User user) ? user.getName() : null;
 
-        if (headerAccessor.getUser() instanceof User user) {
-            customerId = user.getCustomerId();
-        }
-
-        sessionManagerService.registerSession(sessionId, customerId);
+        sessionManagerService.registerSession(sessionId, userId);
         log.info("WebSocket session connected: {}", sessionId);
     }
 
