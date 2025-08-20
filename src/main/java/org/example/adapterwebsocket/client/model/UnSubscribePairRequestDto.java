@@ -1,17 +1,17 @@
 package org.example.adapterwebsocket.client.model;
 
-import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.example.adapterwebsocket.model.CurrencyPair;
 
+import java.util.Set;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RateStreamControlRequest {
+public class UnSubscribePairRequestDto {
 
     private Set<CurrencyPair> currencyPairs;
-    private boolean enabled;
 
 }

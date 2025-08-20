@@ -1,19 +1,20 @@
 package org.example.adapterwebsocket.service;
 
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.CryptoCurrencyClient;
-import org.example.adapterwebsocket.client.model.RateStreamControlRequest;
+import org.example.adapterwebsocket.client.model.UnSubscribePairRequestDto;
 import org.example.adapterwebsocket.dao.entity.UnDisabledCryptoPairEntity;
 import org.example.adapterwebsocket.dao.repository.UnDisabledCryptoPairRepository;
 import org.example.adapterwebsocket.dao.repository.cache.CryptoRateSubscriptionRedisRepository;
 import org.example.adapterwebsocket.model.CurrencyPair;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -23,7 +24,7 @@ public class CryptoRateSubscriptionService {
     private final CryptoCurrencyClient cryptoCurrencyClient;
     private final CryptoRateSubscriptionRedisRepository subscriptionRedisRepository;
     private final UnDisabledCryptoPairRepository unDisabledCryptoPairRepository;
-    private final SessionManager sessionManager;
+    private final SessionManagerService sessionManagerService;
 
     public void subscribe(String sessionId, CurrencyPair currencyPair) {
         log.info("Subscribing session {} to currency pair {}", sessionId, currencyPair);
@@ -60,7 +61,7 @@ public class CryptoRateSubscriptionService {
 
     public void handleSessionDisconnect(String sessionId) {
         Set<CurrencyPair> currencyPairs = subscriptionRedisRepository.removeAllSessionSubscriptions(sessionId);
-        sessionManager.unregisterSession(sessionId);
+        sessionManagerService.unregisterSession(sessionId);
 
         if (currencyPairs.isEmpty()) {
             log.info("Session {} had no subscriptions", sessionId);
@@ -94,8 +95,7 @@ public class CryptoRateSubscriptionService {
 
     private void enableRateStreaming(CurrencyPair currencyPair) {
         try {
-            var request = new RateStreamControlRequest(Set.of(currencyPair), true);
-            cryptoCurrencyClient.controlRateStreaming(request);
+            cryptoCurrencyClient.enableRateStreaming(currencyPair);
             log.info("Successfully enabled rate streaming for {}", currencyPair);
         } catch (Exception ex) {
             log.error("Failed to enable rate streaming for {}: {}", currencyPair, ex.getMessage());
@@ -113,7 +113,7 @@ public class CryptoRateSubscriptionService {
         }
 
         try {
-            cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(currencyPairs, false));
+            cryptoCurrencyClient.disableRateStreaming(new UnSubscribePairRequestDto(currencyPairs));
             log.info("Successfully disabled rate streaming for {} pairs", currencyPairs);
         } catch (Exception e) {
             log.error("Failed to disable rate streaming for {} pairs: {}", currencyPairs, e.getMessage());
@@ -127,7 +127,7 @@ public class CryptoRateSubscriptionService {
         }
 
         List<UnDisabledCryptoPairEntity> entities = currencyPairs.stream()
-                .map(pair -> new UnDisabledCryptoPairEntity(pair.getFrom(), pair.getTo()))
+                .map(pair -> new UnDisabledCryptoPairEntity(pair.getFromCurrency(), pair.getToCurrency()))
                 .toList();
 
         unDisabledCryptoPairRepository.saveAll(entities);
@@ -191,7 +191,7 @@ public class CryptoRateSubscriptionService {
     }
 
     private void performBulkDisable(Set<CurrencyPair> pairsToDisable) {
-        cryptoCurrencyClient.controlRateStreaming(new RateStreamControlRequest(pairsToDisable, false));
+        cryptoCurrencyClient.disableRateStreaming(new UnSubscribePairRequestDto(pairsToDisable));
         log.info("Successfully disabled streaming for {} pairs", pairsToDisable.size());
     }
 

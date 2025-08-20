@@ -6,7 +6,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "auth", url = "localhost:8091/v1/internal/auth")
+@FeignClient(name = "ms-auth", url = "localhost:8081/v1/internal/auth")
 public interface AuthClient {
 
     @GetMapping("/verify")

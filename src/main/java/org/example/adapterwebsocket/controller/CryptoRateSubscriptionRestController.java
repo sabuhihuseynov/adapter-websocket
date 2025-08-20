@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/crypto/rate/subscriptions")
+@RequestMapping("/v1/websockets/crypto/rate/subscriptions")
 @RequiredArgsConstructor
 @Slf4j
 public class CryptoRateSubscriptionRestController {
@@ -21,7 +21,6 @@ public class CryptoRateSubscriptionRestController {
     @GetMapping("/check")
     public ResponseEntity<CryptoRateSubscriptionCheckResponse> hasPairSubscription(CurrencyPair currencyPair) {
         boolean hasActiveSubscriptions = subscriptionService.hasPairSubscription(currencyPair);
-        log.info("Subscription check for {}: {}", currencyPair, hasActiveSubscriptions);
         return ResponseEntity.ok(new CryptoRateSubscriptionCheckResponse(hasActiveSubscriptions));
     }
 }

@@ -1,17 +1,18 @@
 package org.example.adapterwebsocket.model;
 
-import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.Objects;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class CurrencyPair {
 
-    private String from;
-    private String to;
+    private String fromCurrency;
+    private String toCurrency;
 
     public static CurrencyPair fromString(String pairString) {
         if (pairString == null || pairString.trim().isEmpty()) {
@@ -35,17 +36,17 @@ public class CurrencyPair {
             return false;
         }
         CurrencyPair that = (CurrencyPair) o;
-        return Objects.equals(from, that.from) && Objects.equals(to, that.to);
+        return Objects.equals(fromCurrency, that.fromCurrency) && Objects.equals(toCurrency, that.toCurrency);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(from, to);
+        return Objects.hash(fromCurrency, toCurrency);
     }
 
     @Override
     public String toString() {
-        return from + "-" + to;
+        return fromCurrency + "-" + toCurrency;
     }
 }
 

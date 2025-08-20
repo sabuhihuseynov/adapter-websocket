@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.adapterwebsocket.client.AuthClient;
 import org.example.adapterwebsocket.client.model.UserTokenPayload;
 import org.example.adapterwebsocket.model.User;
-import org.example.adapterwebsocket.service.SessionManager;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -14,13 +13,14 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final AuthClient authClient;
-    private final SessionManager sessionManager;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -33,14 +33,10 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             if (authHeader == null) {
                 return message;
             }
-//            UserTokenPayload userTokenPayload = authClient.verify(authHeader);
+            // UserTokenPayload userTokenPayload = authClient.verify(authHeader);
             UserTokenPayload userTokenPayload = getUserTokenPayload(authHeader);
-            String sessionId = accessor.getSessionId();
-            String customerId = userTokenPayload.getCustomerId();
 
-            sessionManager.registerSession(sessionId, customerId);
-
-            accessor.setUser(new User(userTokenPayload.getUserId(), customerId, userTokenPayload.getIndividualId()));
+            accessor.setUser(new User(userTokenPayload.getUserId(), userTokenPayload.getCustomerId(), Instant.now()));
 
             log.info("User {} authenticated for WebSocket session {}", userTokenPayload.getUserId(),
                     accessor.getSessionId());
@@ -55,7 +51,6 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         return UserTokenPayload.builder()
                 .customerId(tokens[0])
                 .userId(tokens[1])
-                .individualId(tokens[2])
                 .build();
     }
 }

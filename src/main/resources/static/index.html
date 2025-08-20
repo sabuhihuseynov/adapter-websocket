@@ -539,8 +539,8 @@
 
         // Send subscription message to server
         stompClient.send('/app/crypto.rate.subscribe', {}, JSON.stringify({
-            from: from,
-            to: to
+            fromCurrency: from,
+            toCurrency: to
         }));
 
         // Subscribe to the topic for rate updates
@@ -580,8 +580,8 @@
 
         // Send unsubscription message to server
         stompClient.send('/app/crypto.rate.unsubscribe', {}, JSON.stringify({
-            from: from,
-            to: to
+            fromCurrency: from,
+            toCurrency: to
         }));
 
         // Unsubscribe from the topic
@@ -610,8 +610,8 @@
         }
 
         ratesList.innerHTML = Object.entries(rates).map(([pair, rate]) => {
-            const formattedTime = rate.dateTime ?
-                new Date(rate.dateTime).toLocaleString() :
+            const formattedTime = rate.date ?
+                new Date(rate.date).toLocaleString() :
                 rate.lastUpdated.toLocaleString();
 
             return `

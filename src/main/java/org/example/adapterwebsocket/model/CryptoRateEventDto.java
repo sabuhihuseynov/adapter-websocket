@@ -3,6 +3,7 @@ package org.example.adapterwebsocket.model;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -12,10 +13,10 @@ import java.util.Objects;
 @AllArgsConstructor
 public class CryptoRateEventDto {
 
-    private String from;
-    private String to;
+    private String fromCurrency;
+    private String toCurrency;
     private BigDecimal rate;
-    private LocalDateTime dateTime;
+    private LocalDateTime date;
 
     @Override
     public boolean equals(Object o) {
@@ -26,15 +27,15 @@ public class CryptoRateEventDto {
             return false;
         }
         CryptoRateEventDto that = (CryptoRateEventDto) o;
-        return Objects.equals(from, that.from)
-                && Objects.equals(to, that.to)
+        return Objects.equals(fromCurrency, that.fromCurrency)
+                && Objects.equals(toCurrency, that.toCurrency)
                 && Objects.equals(rate, that.rate)
-                && Objects.equals(dateTime, that.dateTime);
+                && Objects.equals(date, that.date);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(from, to, rate, dateTime);
+        return Objects.hash(fromCurrency, toCurrency, rate, date);
     }
 }
 
